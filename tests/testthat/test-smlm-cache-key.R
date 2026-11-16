@@ -78,7 +78,7 @@ test_that("prepared_df keys and runs on one settings object", {
   body <- regmatches(src, regexpr("prepared_df <- function\\((.|\\n)*?\\n\\}\\n", src, perl = TRUE))
   expect_match(body, "s <- smlm_settings_from_input(input)", fixed = TRUE)
   expect_match(body, ".prep_key(fname, needs_cluster, two_color, s)", fixed = TRUE)
-  expect_match(body, "apply_meta_filters_batch(df, s)", fixed = TRUE)
+  expect_match(body, "batch_filters(df, s)", fixed = TRUE)          # the shared filter chain
   expect_match(body, "apply_density_thinning(df, fname, s)", fixed = TRUE)
   expect_match(body, "apply_clustering_pipeline(df, s)", fixed = TRUE)
   expect_false(grepl(".PREP_KEY_INPUTS", src, fixed = TRUE))

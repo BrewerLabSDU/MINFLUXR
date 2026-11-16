@@ -11,6 +11,7 @@
 ##     (nothing)
 ##   READS from other parts:
 ##     01_view_upload: smlm_file_store
+##     23_prepared_cache: batch_filters
 ##     27_fiducial_qc: qc_exclude_from
 ## END INTERFACE
 ## ─────────────────────────────────────────────────────────────────────────────
@@ -44,7 +45,7 @@ observeEvent(input$run_prec_cloud, {
   # length and spread filters, fiducial exclusion). If filtering fails the cloud
   # falls back to the unfiltered file, while the drift estimate skips it.
   filt <- lapply(names(store), function(fname)
-    tryCatch(apply_meta_filters_batch(qc_exclude_from(store[[fname]], fname), run_set),
+    tryCatch(batch_filters(qc_exclude_from(store[[fname]], fname), run_set),
              error = function(e) NULL))
   names(filt) <- names(store)
   dfs <- lapply(names(store), function(fname) filt[[fname]] %||% store[[fname]])

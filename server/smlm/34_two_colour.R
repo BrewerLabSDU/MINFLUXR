@@ -17,7 +17,7 @@
 ##     02_multiplex: mplex_cross_pair
 ##     22_spatial_window: spatial_gate_close, spatial_report_windows,
 ##                        spatial_support_of
-##     23_prepared_cache: cluster2_label, deblink_label
+##     23_prepared_cache: batch_filters, cluster2_label, deblink_label
 ## END INTERFACE
 ## ─────────────────────────────────────────────────────────────────────────────
 
@@ -44,7 +44,7 @@ observeEvent(input$run_cross_nn, {
     for (i in seq_along(store)) {
       incProgress(1 / length(store))
       nm <- names(store)[i]
-      df <- apply_meta_filters_batch(store[[nm]], run_set)
+      df <- batch_filters(store[[nm]], run_set)
       if (!nrow(df)) next
 
       # A chosen multiplex pair is collapsed to analysis_group 1/2 FIRST;
@@ -395,7 +395,7 @@ output$download_ripley12 <- downloadHandler(
 # ── shared helper: prepare data for one file in two-color batch ───────────
 #   settings : the run's settings snapshot (smlm_settings_from_input)
 prep_tc_df <- function(raw, settings, needs_cluster) {
-  df <- apply_meta_filters_batch(raw, settings)
+  df <- batch_filters(raw, settings)
   if (!nrow(df)) return(NULL)
   mplex_pair <- mplex_cross_pair()
   if (!is.null(mplex_pair))

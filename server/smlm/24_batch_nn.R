@@ -14,7 +14,7 @@
 ##     02_multiplex: mplex_split_active
 ##     20_dataset_groups: apply_dataset_groups, file_group_map, file_palette
 ##     21_density_normalisation: apply_density_thinning
-##     23_prepared_cache: resolve_unit
+##     23_prepared_cache: batch_filters, resolve_unit
 ##     27_fiducial_qc: qc_exclude_from
 ## END INTERFACE
 ## ─────────────────────────────────────────────────────────────────────────────
@@ -86,7 +86,7 @@ observeEvent(input$run_batch_nn, {
       df <- qc_exclude_from(store[[fname]], fname)
       if (!is.data.frame(df) || !nrow(df)) { n_skipped <- n_skipped + 1L; next }
 
-      df <- tryCatch(apply_meta_filters_batch(df, run_set), error = function(e) NULL)
+      df <- tryCatch(batch_filters(df, run_set), error = function(e) NULL)
       if (is.null(df) || !nrow(df)) { n_skipped <- n_skipped + 1L; next }
       df <- apply_density_thinning(df, fname, run_set)   # opt-in labelling-density match
       if (is.null(df) || !nrow(df)) { n_skipped <- n_skipped + 1L; next }

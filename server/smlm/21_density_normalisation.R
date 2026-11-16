@@ -16,6 +16,7 @@
 ##     01_view_upload: smlm_file_store
 ##     20_dataset_groups: apply_dataset_groups, file_group_map,
 ##                        series_palette
+##     23_prepared_cache: batch_filters
 ##     27_fiducial_qc: qc_exclude_from
 ## END INTERFACE
 ## ─────────────────────────────────────────────────────────────────────────────
@@ -89,7 +90,7 @@ observeEvent(input$run_density, {
       incProgress(0.6 / nf, detail = fname)
       df <- qc_exclude_from(store[[fname]], fname)
       if (!is.data.frame(df) || !nrow(df)) next
-      df <- tryCatch(apply_meta_filters_batch(df, run_set), error = function(e) NULL)
+      df <- tryCatch(batch_filters(df, run_set), error = function(e) NULL)
       if (is.null(df) || !nrow(df)) next
       if (needs_cluster) {
         df <- tryCatch(apply_clustering_pipeline(df, run_set), error = function(e) df)
@@ -466,7 +467,7 @@ build_density_map_fig <- function() {
     prof$close_nm[1] else max(0, as.numeric(input$dens_close_nm %||% 200))
 
   df <- qc_exclude_from(store[[fname]], fname)
-  df <- tryCatch(apply_meta_filters_batch(df, as_smlm_settings(input)), error = function(e) NULL)
+  df <- tryCatch(batch_filters(df, as_smlm_settings(input)), error = function(e) NULL)
   shiny::validate(shiny::need(!is.null(df) && nrow(df) > 0, "No localizations after filtering."))
   if (unit == "cluster")
     df <- tryCatch(apply_clustering_pipeline(df, as_smlm_settings(input)), error = function(e) df)

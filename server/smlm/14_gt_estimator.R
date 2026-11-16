@@ -13,6 +13,7 @@
 ##   READS from other parts:
 ##     01_view_upload: smlm_file_store
 ##     17_plottable_data: plottable_data
+##     23_prepared_cache: batch_filters
 ## END INTERFACE
 ## ─────────────────────────────────────────────────────────────────────────────
 
@@ -50,7 +51,7 @@ observeEvent(input$gt_calib_run, {
   }
   k <- max(1L, as.integer(input$gt_calib_k %||% 1L))
   res <- tryCatch({
-    df <- apply_clustering_pipeline(apply_meta_filters_batch(store[[fn]], run_set), run_set)
+    df <- apply_clustering_pipeline(batch_filters(store[[fn]], run_set), run_set)
     measure_label_multiplicity(df, k_per_structure = k)
   }, error = function(e) { message("[GT-calib] ", conditionMessage(e)); NULL })
   if (is.null(res) || !isTRUE(res$ok)) {

@@ -10,10 +10,11 @@
 ##
 ## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
 ##   DEFINES for other parts:
-##     .small_n_note, .stale_badge, cluster2_label, cluster2_on, deblink_label,
-##     deblink_on, prepared_df, resolve_unit
+##     .small_n_note, .stale_badge, batch_filters, cluster2_label, cluster2_on,
+##     deblink_label, deblink_on, prepared_df, resolve_unit
 ##   READS from other parts:
 ##     01_view_upload: smlm_file_store, z_scale_applied
+##     05_filter_pipeline: meta_full_rng, sd_filt
 ##     21_density_normalisation: apply_density_thinning, density_p_map
 ##     24_batch_nn: nn_batch_params_live
 ##     27_fiducial_qc: fiducial_results, qc_exclude_from
@@ -83,6 +84,24 @@
 ## exclusion list.
 prep_cache_rv <- reactiveVal(list())   # key -> prepared data.frame
 
+# ── The Display tab's filters, applied to ANY stored file ─────────────────────
+# GOAL: every all-files panel filters a file exactly as the main plot filters the
+# active one. Two pieces of filter state live outside the settings object and are
+# handed to the shared chain here:
+#   meta_full_rng  the active dataset's full metadata ranges; a slider still at
+#                  that range is untouched and filters no file
+#   sd_filt        the committed trace-spread ranges (the spread sliders)
+# Use batch_filters() wherever a stored file is filtered; do not call
+# apply_meta_filters_batch() directly from the server, or the panel will ignore
+# the spread filter and clip other files to the active file's metadata range.
+smlm_filter_state <- function()
+  list(full_rng  = shiny::reactiveValuesToList(meta_full_rng),
+       sd_ranges = list(x = sd_filt$x, y = sd_filt$y, z = sd_filt$z))
+batch_filters <- function(df, settings) {
+  st <- smlm_filter_state()
+  apply_meta_filters_batch(df, settings, full_rng = st$full_rng, sd_ranges = st$sd_ranges)
+}
+
 # Everything the prepared data depends on, collapsed to one comparable string.
 # `s` is the settings object the chain will run with; build it once and pass it
 # to both this and the chain.
@@ -104,8 +123,10 @@ prep_cache_rv <- reactiveVal(list())   # key -> prepared data.frame
   ver <- paste(if (is.data.frame(sdf) && ".dataset_tag" %in% names(sdf)) sdf$.dataset_tag[1],
                z_scale_applied(),
                paste(utils::capture.output(utils::str(attr(sdf, "mplex_off"))), collapse = ""))
+  # The filter state that is not in the settings object (see smlm_filter_state).
+  flt <- digest::digest(smlm_filter_state(), algo = "xxhash64")
   paste(fname, needs_cluster, two_color, ver, smlm_settings_key(s), pm_txt,
-        paste(ex, collapse = ","), sep = "##")
+        paste(ex, collapse = ","), flt, sep = "##")
 }
 
 ## Prepared data for one file: cached filter -> thin -> cluster chain.
@@ -123,7 +144,7 @@ prepared_df <- function(fname, needs_cluster = TRUE, two_color = NULL) {
 
   df <- qc_exclude_from(store[[fname]], fname)
   if (!is.data.frame(df) || !nrow(df)) return(NULL)
-  df <- tryCatch(apply_meta_filters_batch(df, s), error = function(e) NULL)
+  df <- tryCatch(batch_filters(df, s), error = function(e) NULL)
   if (is.null(df) || !nrow(df)) return(NULL)
   df <- apply_density_thinning(df, fname, s)
   if (is.null(df) || !nrow(df)) return(NULL)

@@ -54,7 +54,7 @@ test_that("server call sites never pass bare input to a settings helper", {
   src <- unlist(lapply(smlm_server_files(), function(f)                # assembly file + parts
     readLines(file.path(.repo_root, f), warn = FALSE, encoding = "UTF-8")))
   src <- src[!grepl("^\\s*#", src)]
-  fns <- c("apply_meta_filters_batch", "apply_clustering_pipeline", "resolve_channels",
+  fns <- c("apply_meta_filters_batch", "batch_filters", "apply_clustering_pipeline", "resolve_channels",
            "assign_analysis_group", "assign_two_color_group", "deblink_threshold_for_channel",
            "prep_tc_df")
   pat <- sprintf("\\b(%s)\\([^()]*(\\([^()]*\\))?[^()]*,\\s*input\\s*[,)]", paste(fns, collapse = "|"))

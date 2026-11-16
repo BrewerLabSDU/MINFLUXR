@@ -15,8 +15,8 @@
 ##     01_view_upload: smlm_file_store
 ##     20_dataset_groups: apply_dataset_groups, series_palette
 ##     21_density_normalisation: apply_density_thinning
-##     23_prepared_cache: cluster2_label, cluster2_on, deblink_label,
-##                        prepared_df
+##     23_prepared_cache: batch_filters, cluster2_label, cluster2_on,
+##                        deblink_label, prepared_df
 ##     27_fiducial_qc: qc_exclude_from
 ## END INTERFACE
 ## ─────────────────────────────────────────────────────────────────────────────
@@ -399,7 +399,7 @@ observeEvent(input$run_tid_time, {
       df <- qc_exclude_from(store[[fname]], fname)
       if (!is.data.frame(df) || !nrow(df)) next
       # Row-level metadata filters only (efo/cfr/dcr/...); NOT spread/length.
-      df <- tryCatch(apply_meta_filters_batch(df, run_set), error = function(e) NULL)
+      df <- tryCatch(batch_filters(df, run_set), error = function(e) NULL)
       if (is.null(df) || !nrow(df) || !all(c("tid", "tim") %in% names(df))) next
       df <- apply_density_thinning(df, fname, run_set)   # opt-in labelling-density match
       if (is.null(df) || !nrow(df)) next

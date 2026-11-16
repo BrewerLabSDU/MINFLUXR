@@ -10,8 +10,8 @@
 ##
 ## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
 ##   DEFINES for other parts:
-##     filtered_df, metadata_filtered_df, sd_filt, sd_skip_arming,
-##     tid_reset_flag
+##     filtered_df, meta_full_rng, metadata_filtered_df, sd_filt,
+##     sd_skip_arming, tid_reset_flag
 ##   READS from other parts:
 ##     03_dataset_zcal: uploaded_df
 ##     27_fiducial_qc: qc_exclude_from
@@ -67,36 +67,13 @@ metadata_filtered_df <- reactive({
   # reversible - see qc_exclude_from). Active file = input$active_file.
   df <- qc_exclude_from(uploaded_df(), input$active_file)
 
-  # Apply range filter ONLY if user range differs from the dataset's full range
-  rng_filter <- function(dat, nm, rng_val, full_rng) {
-    if (!nm %in% names(dat)) return(dat)
-    if (is.null(rng_val) || length(rng_val) != 2 || any(!is.finite(as.numeric(rng_val)))) return(dat)
-    
-    v <- suppressWarnings(as.numeric(dat[[nm]]))
-    if (!length(v)) return(dat)
-    
-    # Prefer stored full range; fall back to computed full finite range if needed
-    if (is.null(full_rng) || length(full_rng) != 2 || any(!is.finite(as.numeric(full_rng)))) {
-      vv <- v[is.finite(v)]
-      if (!length(vv)) return(dat)
-      full_rng <- range(vv, na.rm = TRUE)
-    }
-    
-    # If unchanged from defaults, treat as "no filter"
-    if (isTRUE(all.equal(as.numeric(rng_val), as.numeric(full_rng), tolerance = 0))) return(dat)
-    
-    # When filtering is active: keep NA rows (so they don't vanish unexpectedly)
-    dplyr::filter(dat, is.na(.data[[nm]]) | dplyr::between(.data[[nm]], rng_val[1], rng_val[2]))
-  }
-  
-  df %>%
-    rng_filter("efo",   input$efo_range,   meta_full_rng$efo) %>%
-    rng_filter("cfr",   input$cfr_range,   meta_full_rng$cfr) %>%
-    rng_filter("tim",   input$tim_range,   meta_full_rng$tim) %>%
-    rng_filter("dcr",   input$dcr_range,   meta_full_rng$dcr) %>%
-    rng_filter("eco",   input$eco_range,   meta_full_rng$eco) %>%
-    rng_filter("dwell", input$dwell_range, meta_full_rng$dwell) %>%
-    rng_filter("fluo",  input$fluo_range,  meta_full_rng$fluo)
+  # Ranges are applied only where the user's range differs from the dataset's full
+  # range (smlm_filter_meta, R/smlm_filters.R - the same function the all-files
+  # chain uses).
+  smlm_filter_meta(df,
+    list(efo = input$efo_range, cfr = input$cfr_range, tim = input$tim_range, dcr = input$dcr_range,
+         eco = input$eco_range, dwell = input$dwell_range, fluo = input$fluo_range),
+    shiny::reactiveValuesToList(meta_full_rng))
 })
 
 # ===========================================================================
@@ -219,40 +196,11 @@ output$trim_summary_ui <- renderUI({
 
 # Stage 2: spread filter - per-trace SD applied after metadata row filters
 spread_filtered_df <- reactive({
-  df <- trimmed_df()
-  if (!is.data.frame(df) || !nrow(df) || !"tid" %in% names(df)) return(df)
-
-  # sd_filt holds the committed filter bounds set by the user.
-  # c(0, Inf) upper bound = "no filter" - all traces pass regardless of spread.
-  # This avoids every floating-point comparison edge case that arose from
-  # matching widget values against data maxima computed from different subsets.
-  rx <- c(sd_filt$x[1], sd_filt$x[2])
-  ry <- c(sd_filt$y[1], sd_filt$y[2])
-  rz <- c(sd_filt$z[1], sd_filt$z[2])
-
-  # "No filter on this axis" needs BOTH ends open, not just the upper one. An
-  # upper bound of Inf with a lower bound still set means "at least this much,
-  # no ceiling" - treating Inf alone as no-filter would silently discard the
-  # lower bound the user typed.
-  open <- function(r) is.infinite(r[2]) && r[1] <= 0
-  if (open(rx) && open(ry) && open(rz)) return(df)
-
-  # per-tid SDs computed from CURRENT df (after metadata filters)
-  sda <- sd_by_tid(df, min_n = input$sd_min_locs)
-  if (!is.data.frame(sda) || !nrow(sda)) return(df[0, , drop = FALSE])
-
-  if (!"sd_z" %in% names(sda)) sda$sd_z <- NA_real_
-
-  # A trace whose spread is undefined on an axis (too few localizations) is
-  # never judged on that axis - unchanged behaviour.
-  in_rng <- function(v, r) is.na(v) | (v >= r[1] & (is.infinite(r[2]) | v <= r[2]))
-  pass_x <- open(rx) | in_rng(sda$sd_x, rx)
-  pass_y <- open(ry) | in_rng(sda$sd_y, ry)
-  pass_z <- open(rz) | in_rng(sda$sd_z, rz)
-
-  keep_tids <- sda$tid[ pass_x & pass_y & pass_z ]
-
-  df %>% dplyr::filter(tid %in% keep_tids)
+  # sd_filt holds the committed filter bounds set by the user; c(0, Inf) = no
+  # filter on that axis. The test itself is smlm_filter_spread() (R/smlm_filters.R),
+  # shared with the all-files chain.
+  smlm_filter_spread(trimmed_df(), c(sd_filt$x[1], sd_filt$x[2]), c(sd_filt$y[1], sd_filt$y[2]),
+                     c(sd_filt$z[1], sd_filt$z[2]), input$sd_min_locs)
 })
 # ==========================================================================
 # FILTER PIPELINE - Stage 3 of 3: per-TRACE localization count
@@ -278,12 +226,8 @@ spread_filtered_df <- reactive({
 filtered_df <- reactive({
   df <- spread_filtered_df()
 
-  # tid length filter
-  if ("tid" %in% names(df) && !is.null(input$tid_length_range)) {
-    tl <- table(df$tid)
-    keep <- names(tl)[tl >= input$tid_length_range[1] & tl <= input$tid_length_range[2]]
-    df <- df %>% dplyr::filter(tid %in% keep)
-  }
+  # tid length filter (smlm_filter_length, shared with the all-files chain)
+  df <- smlm_filter_length(df, input$tid_length_range)
   # Make positive
   if (isTRUE(input$make_positive)) {
     min_x <- suppressWarnings(min(df$x, na.rm = TRUE))

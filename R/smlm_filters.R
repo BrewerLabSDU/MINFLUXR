@@ -847,42 +847,135 @@ add_median_vlines <- function(fig, meds, colors = NULL, digits = 3, unit = "") {
 
 # ---- Batch NN helpers -------------------------------------------------------
 
-# Apply the metadata, outlier, length and spread filters to a raw stored df (no
-# bypass logic - the ranges are applied as-is so that the same thresholds work
-# across all loaded files in batch mode).
-#   settings : smlm_settings or Shiny input (the "filter" settings)
-apply_meta_filters_batch <- function(df, settings) {
-  s <- as_smlm_settings(settings)
-  hard_filter <- function(dat, nm, rng_val) {
+# =============================================================================
+# THE SMLM FILTER STAGES - one implementation for the plot and for every panel
+# =============================================================================
+# GOAL: the filters set in the Display tab mean the same thing wherever data is
+# analysed. The active file's reactive chain (server/smlm/05_filter_pipeline.R)
+# and the all-files chain (apply_meta_filters_batch(), used by prepared_df() and
+# the batch panels) both call the stage functions below, so they cannot drift
+# apart again. Before 2026-11 each chain had its own code and they disagreed:
+# the batch chain clipped every file to the active file's metadata range even
+# with untouched sliders, and never applied the trace-spread ranges at all.
+#
+# ORDER:  metadata ranges -> outlier localizations -> trace length -> trace spread
+#   Rows first, then whole traces are judged on the points that survived. The two
+#   trace-level stages each keep or drop whole traces from the same trimmed
+#   points, so their relative order does not change the result.
+
+# ── smlm_filter_meta() ────────────────────────────────────────────────────────
+# GOAL: stage 1, per-LOCALIZATION ranges on the metadata columns.
+# ranges : named list, column -> c(lo, hi); NULL or non-finite = no filter
+# full   : named list, column -> the range the slider was initialised to (the
+#          active dataset's full range). A range equal to it is UNTOUCHED and
+#          filters nothing, on any file. This is what makes a slider at its
+#          default a true no-op: comparing widget values with data maxima would
+#          otherwise drop boundary points, and would clip every other file to the
+#          active file's range. With no entry in `full`, the file's own range is
+#          used for the comparison.
+# Rows with a missing value in the column are kept.
+smlm_filter_meta <- function(df, ranges, full = NULL) {
+  rng_filter <- function(dat, nm, rng_val, full_rng) {
     if (!nm %in% names(dat)) return(dat)
     if (is.null(rng_val) || length(rng_val) != 2 || any(!is.finite(as.numeric(rng_val)))) return(dat)
-    lo <- rng_val[1]; hi <- rng_val[2]
-    dplyr::filter(dat, is.na(.data[[nm]]) | (.data[[nm]] >= lo & .data[[nm]] <= hi))
+
+    v <- suppressWarnings(as.numeric(dat[[nm]]))
+    if (!length(v)) return(dat)
+
+    # Prefer stored full range; fall back to computed full finite range if needed
+    if (is.null(full_rng) || length(full_rng) != 2 || any(!is.finite(as.numeric(full_rng)))) {
+      vv <- v[is.finite(v)]
+      if (!length(vv)) return(dat)
+      full_rng <- range(vv, na.rm = TRUE)
+    }
+
+    # If unchanged from defaults, treat as "no filter"
+    if (isTRUE(all.equal(as.numeric(rng_val), as.numeric(full_rng), tolerance = 0))) return(dat)
+
+    # When filtering is active: keep NA rows (so they do not vanish unexpectedly)
+    dplyr::filter(dat, is.na(.data[[nm]]) | dplyr::between(.data[[nm]], rng_val[1], rng_val[2]))
   }
-  df <- df %>%
-    hard_filter("efo",   s$efo_range)   %>%
-    hard_filter("cfr",   s$cfr_range)   %>%
-    hard_filter("dcr",   s$dcr_range)   %>%
-    hard_filter("eco",   s$eco_range)   %>%
-    hard_filter("tim",   s$tim_range)   %>%
-    hard_filter("dwell", s$dwell_range) %>%
-    hard_filter("fluo",  s$fluo_range)
-  # Outlier localizations - Stage 1b, and it MUST come before the length filter
-  # below, exactly as in the interactive pipeline: a trimmed point is not a
-  # localization of that trace, so it must not count toward its length either.
-  if (isTRUE(s$trim_outliers) && "tid" %in% names(df) && nrow(df)) {
-    fl <- tryCatch(trace_point_outliers(df, k = s$trim_k, keep_n = s$sd_min_locs),
-          error = function(e) NULL)
-    if (!is.null(fl) && length(fl) == nrow(df)) df <- df[!fl, , drop = FALSE]
-  }
-  # TID length filter
-  tlr <- s$tid_length_range
-  if ("tid" %in% names(df) && !is.null(tlr) && length(tlr) == 2 && all(is.finite(tlr))) {
-    tl   <- table(df$tid)
-    keep <- names(tl)[tl >= tlr[1] & tl <= tlr[2]]
-    df   <- dplyr::filter(df, tid %in% keep)
-  }
-  # Trace spread (σ) filter, the batch form of the Display tab's spread filter
+  for (nm in names(ranges)) df <- rng_filter(df, nm, ranges[[nm]], full[[nm]])
+  df
+}
+
+# ── smlm_filter_trim() ────────────────────────────────────────────────────────
+# GOAL: stage 1b, drop the localizations that do not belong to their trace
+# (trace_point_outliers), before any per-trace statistic is taken.
+smlm_filter_trim <- function(df, enabled, k, keep_n) {
+  if (!isTRUE(enabled) || !is.data.frame(df) || !nrow(df) || !"tid" %in% names(df)) return(df)
+  fl <- tryCatch(trace_point_outliers(df, k = k, keep_n = keep_n), error = function(e) NULL)
+  if (is.null(fl) || length(fl) != nrow(df)) return(df)
+  df[!fl, , drop = FALSE]
+}
+
+# ── smlm_filter_length() ──────────────────────────────────────────────────────
+# GOAL: keep traces whose localization count lies in rng = c(min, max). NULL or
+# a missing bound = no filter; an infinite maximum means "no upper limit".
+smlm_filter_length <- function(df, rng) {
+  if (!"tid" %in% names(df) || is.null(rng) || length(rng) != 2 || anyNA(rng) || !is.finite(rng[1]))
+    return(df)
+  tl   <- table(df$tid)
+  keep <- names(tl)[tl >= rng[1] & tl <= rng[2]]
+  dplyr::filter(df, tid %in% keep)
+}
+
+# ── smlm_filter_spread() ──────────────────────────────────────────────────────
+# GOAL: keep traces whose per-axis spread (sd_by_tid) lies in the committed
+# ranges. A trace that is too scattered is drift or two merged molecules, and
+# its median position is what everything downstream uses.
+# rx, ry, rz : c(lo, hi) per axis; c(0, Inf) = no filter on that axis
+# min_n      : localizations a trace needs for its spread to be defined; a trace
+#              with an undefined spread on an axis is not judged on that axis
+smlm_filter_spread <- function(df, rx, ry, rz, min_n) {
+  if (!is.data.frame(df) || !nrow(df) || !"tid" %in% names(df)) return(df)
+  # "No filter on this axis" needs BOTH ends open, not just the upper one. An
+  # upper bound of Inf with a lower bound still set means "at least this much,
+  # no ceiling" - treating Inf alone as no-filter would silently discard the
+  # lower bound the user typed.
+  open <- function(r) is.infinite(r[2]) && r[1] <= 0
+  if (open(rx) && open(ry) && open(rz)) return(df)
+
+  # per-tid SDs computed from CURRENT df (after the row filters)
+  sda <- sd_by_tid(df, min_n = min_n)
+  if (!is.data.frame(sda) || !nrow(sda)) return(df[0, , drop = FALSE])
+
+  if (!"sd_z" %in% names(sda)) sda$sd_z <- NA_real_
+
+  # A trace whose spread is undefined on an axis (too few localizations) is
+  # never judged on that axis.
+  in_rng <- function(v, r) is.na(v) | (v >= r[1] & (is.infinite(r[2]) | v <= r[2]))
+  pass_x <- open(rx) | in_rng(sda$sd_x, rx)
+  pass_y <- open(ry) | in_rng(sda$sd_y, ry)
+  pass_z <- open(rz) | in_rng(sda$sd_z, rz)
+
+  keep_tids <- sda$tid[ pass_x & pass_y & pass_z ]
+
+  df %>% dplyr::filter(tid %in% keep_tids)
+}
+
+# ── apply_meta_filters_batch() ────────────────────────────────────────────────
+# GOAL: the whole filter chain on one stored file, for the all-files panels.
+#   settings  : smlm_settings or Shiny input (the "filter" settings)
+#   full_rng  : see smlm_filter_meta(); the server passes the active dataset's
+#               full ranges, so untouched sliders filter no file
+#   sd_ranges : list(x, y, z) of committed spread ranges (the Display tab's
+#               spread sliders); the server passes them so the spread filter the
+#               user set applies to every file.
+# Called without sd_ranges (scripts, older tests), the spread stage falls back to
+# the target_sd_x / target_sd_y settings. Those have no widget in the app, so
+# that branch never runs there; it is kept so existing scripts give the same
+# numbers.
+apply_meta_filters_batch <- function(df, settings, full_rng = NULL, sd_ranges = NULL) {
+  s <- as_smlm_settings(settings)
+  ranges <- list(efo = s$efo_range, cfr = s$cfr_range, dcr = s$dcr_range, eco = s$eco_range,
+                 tim = s$tim_range, dwell = s$dwell_range, fluo = s$fluo_range)
+  df <- smlm_filter_meta(df, ranges, full_rng)
+  df <- smlm_filter_trim(df, s$trim_outliers, s$trim_k, s$sd_min_locs)
+  df <- smlm_filter_length(df, s$tid_length_range)
+  if (!is.null(sd_ranges))
+    return(smlm_filter_spread(df, sd_ranges$x, sd_ranges$y, sd_ranges$z, s$sd_min_locs))
+
   if (isTRUE(s$view_SD) && "tid" %in% names(df)) {
     tx <- s$target_sd_x; ty <- s$target_sd_y
     if (!is.null(tx) && !is.null(ty) && is.finite(tx) && is.finite(ty) && tx > 0 && ty > 0) {
