@@ -7,6 +7,39 @@ while the app is below 1.0 the panel layout and the settings JSON may still chan
 
 First public release (Zenodo).
 
+### SMLM: one filter chain for the plot and the all-files panels
+
+- **The trace spread filter now applies to every loaded file.** The spread ranges set in the Display
+  tab reach Ripley, g(r), Batch NN and the other all-files panels. They previously applied to the main
+  plot only.
+- **A metadata range left at its full extent filters no file.** The all-files panels used to apply the
+  slider values as they stood, which clipped every other file to the active file's range even when no
+  filter had been set. A range now filters only once it has been narrowed, and then applies to all
+  files.
+- **Filter order is the same everywhere:** metadata ranges, outlier localizations, trace length, trace
+  spread.
+- **"Remove rogue traces by rule" has been removed.** The trace spread filter and the outlier trimming
+  cover its purpose. Settings files that carry the three rogue settings still load; those entries are
+  ignored, so a file saved with rogue removal on gives the data without it.
+- Crops (3D box or sphere, 2D crop to view) remain a per-dataset choice on the main plot and do not
+  apply to the all-files panels.
+
+### Tracking
+
+- **The localization precision is published on the first run.** "Estimate σ_loc" and "Plot MSD" set
+  the app-wide σ_loc only from the second press on, so JDD, D-map, change-point, HMM and the
+  confinement null ran without noise subtraction after a single press.
+- **The change-point CSV export no longer fails** when a segment has D = 0 after noise subtraction.
+  Such a segment gets an empty mixture component.
+
+### Code structure and tests
+
+- The three server functions are split into part files under `server/`, one panel or core concern
+  each, with the computation in `R/`. See `server/README.md` and `docs/architecture_review.md`.
+- Golden-output tests pin the numbers of every analysis panel on fixed simulated data, and smoke
+  tests render every output. The default test run takes about 3.5 minutes;
+  `MINFLUXR_SKIP_APP_TESTS=true` leaves these out.
+
 ### SMLM: two-color display
 
 - **Median Cluster wraps keep the channel color when only one channel has clusters.** The isosurface

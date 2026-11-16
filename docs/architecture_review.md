@@ -846,13 +846,20 @@ Now (R/smlm_filters.R, "THE SMLM FILTER STAGES"):
   and scripts read as before. They are used only when `apply_meta_filters_batch()`
   is called without spread ranges, which the app no longer does.
 
-Still different between the two chains, and still open:
-- **Crops** (3D box/sphere, 2D crop to view) apply to the main plot only.
-- **Rogue removal** applies to the main plot only. It is not in
-  `SMLM_SETTINGS_SPEC`, so applying it to the batch chain also means adding
-  `remove_rogues`, `rogue_rule`, `rogue_factor` to the spec and the cache key.
+Decided afterwards:
+- **Rogue removal was removed from the app.** It predates the spread filter and
+  the outlier trimming, which cover its purpose. The checkbox, its two controls,
+  the step in `plottable_data`, `remove_rogue_traces()` and the settings entries
+  are gone. Settings files that carry `remove_rogues`, `rogue_rule`,
+  `rogue_factor` still load; those keys are ignored.
+- **Crops stay per dataset.** A crop (3D box/sphere, 2D crop to view) is a choice
+  made on the main plot for one dataset and is not applied to the all-files
+  panels. A golden test asserts the crop is the only difference: inside the crop
+  box the two chains hold the same localizations.
+
+Remaining differences, by design:
 - `make_positive` shifts coordinates for display in the main plot only.
-- Density thinning applies to the batch chain only (it exists to make files
+- Density thinning applies to the all-files chain only (it exists to make files
   comparable).
 
 ### 9.2 Change-point segmentation and dark cycles (S1, S2)
