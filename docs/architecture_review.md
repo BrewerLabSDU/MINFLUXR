@@ -421,6 +421,24 @@ each handler's 60 to 130 lines are this frame.
   (R/est_msd.R:352). They agree while SW is well under half a cycle and no step is
   shorter than half a cycle.
 
+- **B4. The first "Estimate σ_loc" run does not publish σ.** The observer that
+  copies the CVE result into the app-wide noise floor (server_tracking.R:654-659)
+  is `observeEvent(trk_cve_bundle(), ..., ignoreInit = TRUE)`. At session start
+  `trk_cve_bundle()` stops with `req()` (button not pressed), which does not count
+  as the initial run, so the first *successful* run is the one `ignoreInit`
+  swallows. After one press `trk_sigma_loc_eff()` is still NA and
+  `trk_sigma_loc_src()` says "not set"; JDD, D-map, change-point, HMM and the
+  confinement null then run with no noise subtraction. A second press publishes
+  it. Seen in `testServer` (pinned as `sigma_loc_first_run` in the tracking
+  golden) and it follows from how `bindEvent` handles `ignoreInit`; please
+  confirm once in the running app.
+- **B5. The change-point CSV download fails when any segment has D = 0.**
+  server_tracking.R:5857-5864 calls `mclust::predict.Mclust(gmm, log10_D)` on all
+  segments inside `ifelse()`, including those with `log10(0) = -Inf`, and stops
+  with "NA/NaN/Inf in foreign function call". D = 0 segments exist whenever noise
+  subtraction clamps (see S2), so the export fails exactly for data with an
+  immobile fraction. Pinned as an error status in the smoke test.
+
 ### 3.6 Inconsistencies between the SMLM and tracking tabs
 
 | Aspect | SMLM | Tracking |
@@ -539,6 +557,10 @@ meant to agree.
 
 **Q2. MSD fit window lower bound: 4 or 5?** (B2.) The UI default is 5. Which value
 did earlier reported numbers use? Only matters where the input was NULL.
+
+**Q2b. Should the first σ_loc run publish?** (B4.) If yes, removing
+`ignoreInit = TRUE` at server_tracking.R:659 fixes it; it changes what the
+noise-subtracting panels compute after a single press, so it is yours to decide.
 
 **Q3. Is the 200 ms debounce at server_tracking.R:3497 wanted?** (B1.) Fixing it
 changes how fast playback parameters apply, not any number.

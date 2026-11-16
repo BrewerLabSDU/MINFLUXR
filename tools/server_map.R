@@ -15,7 +15,8 @@
 ## USE
 ##   Rscript tools/server_map.R                 # maps the three server closures
 ##   Rscript tools/server_map.R out_dir         # writes <out_dir>/<name>_map.csv
-##   From R:  source("tools/server_map.R"); m <- map_server_closure(file, fn)
+##   From R:  source("tools/server_map.R"); m <- server_statement_map("smlm")
+##   Run from the repo root.
 ##
 ## It only parses the code (no package is loaded, nothing is run).
 ## ─────────────────────────────────────────────────────────────────────────────
@@ -178,22 +179,49 @@ closure_duplicates <- function(map) {
   unique(nm[duplicated(nm)])
 }
 
+# The three server closures: the file that defines the function, and the folder
+# that holds its part files once the closure is split (see server/README.md).
+SERVER_CLOSURES <- list(
+  smlm     = list(file = "server_smlm.R",     fn = "smlm_server",     parts = file.path("server", "smlm")),
+  tracking = list(file = "server_tracking.R", fn = "tracking_server", parts = file.path("server", "tracking")),
+  sim      = list(file = "sim_server.R",      fn = "sim_server",      parts = file.path("server", "sim"))
+)
+
+# GOAL: the statement map of one tab's server closure, wherever its code lives:
+# in the single server file, or spread over ordered part files. With part files,
+# a name defined in any part counts as a dependency in every part, as it does at
+# run time (all parts share one environment).
+# tab : "smlm", "tracking" or "sim". Run from the repo root.
+server_statement_map <- function(tab) {
+  s <- SERVER_CLOSURES[[tab]]
+  if (is.null(s)) stop("unknown tab: ", tab)
+  parts <- if (dir.exists(s$parts)) sort(list.files(s$parts, "[.]R$", full.names = TRUE)) else character(0)
+  if (!length(parts)) return(map_server_closure(s$file, s$fn))
+  first <- lapply(parts, map_server_closure, fn_name = NULL)
+  known <- unique(unlist(lapply(first, attr, "defined")))
+  out   <- do.call(rbind, lapply(parts, map_server_closure, fn_name = NULL, known = known))
+  attr(out, "defined") <- known
+  out
+}
+
 if (sys.nframe() == 0L) {
   args    <- commandArgs(trailingOnly = TRUE)
   out_dir <- if (length(args)) args[1] else NULL
-  targets <- list(c("server_smlm.R", "smlm_server"), c("server_tracking.R", "tracking_server"),
-                  c("sim_server.R", "sim_server"))
-  for (t in targets) {
-    if (!file.exists(t[1])) next
-    m <- map_server_closure(t[1], t[2])
-    cat(sprintf("\n%s :: %s  -  %d top-level statements\n", t[1], t[2], nrow(m)))
+  for (tab in names(SERVER_CLOSURES)) {
+    s <- SERVER_CLOSURES[[tab]]
+    if (!file.exists(s$file)) next
+    m <- server_statement_map(tab)
+    cat(sprintf("
+%s  -  %d top-level statements in %d file(s)
+", s$fn, nrow(m), length(unique(m$file))))
     print(table(m$kind))
     d <- closure_duplicates(m)
-    if (length(d)) cat("DUPLICATE closure-level names:", paste(d, collapse = ", "), "\n")
+    if (length(d)) cat("DUPLICATE closure-level names:", paste(d, collapse = ", "), "
+")
     if (!is.null(out_dir)) {
       dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
-      utils::write.csv(m, file.path(out_dir, paste0(t[2], "_map.csv")), row.names = FALSE)
-      utils::write.csv(closure_fan_in(m), file.path(out_dir, paste0(t[2], "_fan_in.csv")), row.names = FALSE)
+      utils::write.csv(m, file.path(out_dir, paste0(s$fn, "_map.csv")), row.names = FALSE)
+      utils::write.csv(closure_fan_in(m), file.path(out_dir, paste0(s$fn, "_fan_in.csv")), row.names = FALSE)
     }
   }
 }

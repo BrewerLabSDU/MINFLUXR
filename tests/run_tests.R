@@ -3,16 +3,24 @@
 ## ─────────────────────────────────────────────────────────────────────────────
 ##
 ## PURPOSE
-##   Recovery tests for the estimators that already live in top-level helper
-##   files (helpers_tracking.R, helpers_smlm.R). Each test states a claim the
-##   methods doc makes and checks it against simulated ground truth, so the claim
-##   cannot silently stop being true. Estimators still nested inside the Shiny
-##   server closure (CVE, MSD OLSF, JDD, HMM, change-point, D-map) cannot be
-##   called from here yet; extracting them is Phase 2 of the publication plan.
+##   1. Recovery tests for the estimators and SMLM computations in R/ and the
+##      helper files. Each test states a claim the methods doc makes and checks
+##      it against simulated ground truth, so the claim cannot silently stop
+##      being true.
+##   2. Golden-output tests (test-golden-*.R): for fixed simulated data, every
+##      analysis panel of the three tabs must return the numbers stored in
+##      tests/testthat/_golden/. They guard refactoring: a change of structure
+##      must not change a result.
+##   3. Smoke tests (test-smoke-servers.R): every output of the three server
+##      functions keeps its render status after all panels have been triggered.
+##   Groups 2 and 3 drive the server functions in shiny::testServer (no browser).
 ##
 ## RUN
 ##   From the repo root:  Rscript tests/run_tests.R
-##   Slow Monte-Carlo tests are skipped unless MINFLUXR_SLOW_TESTS=true.
+##   MINFLUXR_SLOW_TESTS=true      also run the slow Monte-Carlo tests
+##   MINFLUXR_SKIP_APP_TESTS=true  leave out groups 2 and 3 (they load the whole app)
+##   MINFLUXR_UPDATE_GOLDEN=true   rewrite the golden files; only for a deliberate
+##                                 change of method, and say why in the commit
 ## ─────────────────────────────────────────────────────────────────────────────
 library(testthat)
 root <- if (file.exists("global.R")) "." else ".."          # repo root or tests/
