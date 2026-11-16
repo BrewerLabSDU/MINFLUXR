@@ -246,11 +246,13 @@ output$trk_dl_cpd_csv <- downloadHandler(
     gmm  <- tryCatch(cpd_gmm_rv(),      error = function(e) NULL)
     if (!is.null(segs) && !is.null(gmm)) {
       log10_D   <- log10(segs$D_um2_s)
-      segs$gmm_component <- ifelse(
-        is.finite(log10_D),
-        mclust::predict.Mclust(gmm, log10_D)$classification,
-        NA_integer_
-      )
+      # Classify only the segments that entered the mixture. A segment whose
+      # noise-subtracted D is 0 has log10 D = -Inf, which predict() rejects for
+      # the whole call; it gets NA, as a segment outside the fit should.
+      ok   <- is.finite(log10_D)
+      comp <- rep(NA_integer_, nrow(segs))
+      if (any(ok)) comp[ok] <- as.integer(mclust::predict.Mclust(gmm, log10_D[ok])$classification)
+      segs$gmm_component <- comp
     }
     write.csv(segs, file, row.names = FALSE)
   }
