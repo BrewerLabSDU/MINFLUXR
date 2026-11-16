@@ -139,7 +139,9 @@ results are in `tests/validation/`.
 | [`docs/simulation_module.md`](docs/simulation_module.md) | The ground-truth diffusion simulator: model, validation and the CVE round-trip on D |
 | [`docs/sigma_loc_model.md`](docs/sigma_loc_model.md) | The tracking localization-precision model: derivation and immobile-sample calibration |
 | [`THIRD-PARTY.md`](THIRD-PARTY.md) | External work this builds on, what was taken and what was changed |
-| File headers in `helpers_*.R`, `server_*.R`, `R/est_*.R`, `R/smlm_*.R` | Code architecture: each file opens with a map of its contents, data flow and conventions |
+| [`server/README.md`](server/README.md) | How the server code is laid out: one part file per panel under `server/<tab>/`, computation in `R/` |
+| [`docs/architecture_review.md`](docs/architecture_review.md) | Data flow from file load to every panel, the reactive structure, known problems and open questions |
+| File headers in `helpers_*.R`, `server_*.R`, `server/<tab>/*.R`, `R/*.R` | Each file opens with what it holds; each server part lists what it defines for and reads from the other parts |
 
 ---
 

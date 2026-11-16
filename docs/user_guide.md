@@ -165,6 +165,13 @@ moving emitters).
   bound on that side (blank lower reads as 0, blank upper as no upper limit), so clearing both leaves
   that axis unfiltered. See [Trace Spread](#trace-spread-sd-filter).
 
+**Filters apply to every loaded file alike.** The metadata ranges, the outlier trimming, the trace
+length range and the trace spread ranges are applied in that order, to the active file on the main
+plot and to each file an all-files panel analyses (Ripley's L, g(r), Batch NN and the others). A
+metadata range that still spans the active file's full extent counts as unset and filters no file;
+once narrowed, its two values apply to all files. A crop (3D box or sphere, 2D crop to view) is set
+per dataset on the main plot and is left out of the all-files panels.
+
 **Download / Load Filter Settings** saves and restores, as JSON, every setting that changes results
 (filters, trimming, channel split, de-blinking, median clustering, density thinning, fiducial
 exclusion, axial calibration) together with the crop and the display state. Loading an older file
