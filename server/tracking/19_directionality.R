@@ -99,96 +99,15 @@ dir_bundle <- eventReactive(input$trk_dir_run, {
   df <- trk(); req(nrow(df) > 0)
   min_pts  <- max(4L, as.integer(input$trk_dir_min_pts))
   max_dark <- max(0L, as.integer(input$trk_dir_max_dark %||% 2L))
-
-  df <- df[is.finite(df$x) & is.finite(df$y) & is.finite(df$tim), ]
-  df <- df[order(df$tid, df$tim), ]
-  sp <- split(df, df$tid)
-
-  # Cycle time: the autocorrelation lag is measured in ELAPSED TIME, expressed as
-  # integer cycle counts (like the MSD), not raw step index. On irregular MINFLUX
-  # sampling a "step" is not a fixed Δt, so a step-index lag would misrepresent
-  # unevenly-spaced points as evenly spaced. When the cycle time is unknown we fall
-  # back to step-index lags and say so.
-  t_c       <- tryCatch(trk_cycle_time(), error = function(e) NA_real_)
-  have_cyc  <- is.finite(t_c) && t_c > 0
-  max_lag   <- 20L                       # cycles (or steps in fallback)
-
-  # Pre-allocate angle storage as a list then unlist once at the end
-  angle_list <- vector("list", length(sp))
-  ac_sums    <- rep(0,  max_lag)
-  ac_n       <- rep(0L, max_lag)
-  # Localization-noise floor on a 2D step magnitude: RMS pure-noise step = 2·σ_loc.
-  # Steps below it have noise-dominated directions (inflate the 180° turn-angle
-  # peak and the lag-1 anti-correlation). Count them to quantify how much of the
-  # directionality signal is noise. Uses the app-wide σ_loc.
+  # Cycle time for the lag axis and the app-wide sigma_loc for the noise floor;
+  # the computation is dir_compute() in R/est_directionality.R.
+  t_c     <- tryCatch(trk_cycle_time(), error = function(e) NA_real_)
   sig_dir <- tryCatch(trk_sigma_loc_eff(), error = function(e) NA_real_)
-  r_noise <- if (is.finite(sig_dir) && sig_dir > 0) 2 * sig_dir else NA_real_
-  n_steps_tot <- 0L; n_below <- 0L; n_dropped_dark <- 0L
-
   withProgress(message = "Computing directionality…", value = 0, {
-  for (ii in seq_along(sp)) {
-    if (ii %% 50L == 0L) incProgress(50 / length(sp))
-    tb <- sp[[ii]]
-    if (nrow(tb) < min_pts) next
-    dx  <- diff(tb$x); dy <- diff(tb$y)
-    dtt <- diff(tb$tim)
-    if (length(dx) < 2) next
-
-    mag <- sqrt(dx^2 + dy^2)
-    # Per-step dark-cycle count. A "usable" step spans ≤ max_dark dark cycles
-    # (integrated = 0 dark) and has non-zero length. Steps across long gaps are
-    # dropped: the direction over a big gap is unreliable and may bridge a merge
-    # with another molecule.
-    n_cyc  <- if (have_cyc) pmax(1L, as.integer(round(dtt / t_c))) else rep(1L, length(dtt))
-    usable <- mag > 0 & is.finite(n_cyc) & ((n_cyc - 1L) <= max_dark)
-    n_steps_tot    <- n_steps_tot + length(mag)
-    n_dropped_dark <- n_dropped_dark + sum(mag > 0 & (n_cyc - 1L) > max_dark, na.rm = TRUE)
-    if (is.finite(r_noise)) n_below <- n_below + sum(mag < r_noise & usable, na.rm = TRUE)
-
-    # --- Turn angles: only between two CONSECUTIVE usable steps (share a loc) ---
-    ok_pair <- usable[-length(usable)] & usable[-1]
-    if (any(ok_pair)) {
-      dot   <- dx[-length(dx)] * dx[-1] + dy[-length(dy)] * dy[-1]
-      denom <- mag[-length(mag)] * mag[-1]
-      cos_a <- dot[ok_pair] / denom[ok_pair]
-      cos_a <- pmax(-1, pmin(1, cos_a))
-      angle_list[[ii]] <- acos(cos_a) * 180 / pi
-    }
-
-    # --- Velocity autocorrelation, binned by ELAPSED-TIME (cycle-index) lag ---
-    # Each usable step's reference position on the track's cumulative cycle
-    # timeline is the cycle index of its start localization. Pairs of usable steps
-    # are accumulated into the bin = difference of those cycle indices, so a lag of
-    # k means k cycles of real time, however many localizations were skipped.
-    cyc_start <- c(0L, cumsum(n_cyc))          # per-loc cumulative cycle index
-    cyc_start <- cyc_start[-length(cyc_start)] # start-of-step index (length = #steps)
-    ux <- ifelse(usable, dx / mag, NA_real_)
-    uy <- ifelse(usable, dy / mag, NA_real_)
-    idx_u <- which(usable)
-    for (a in idx_u) {
-      ca <- cyc_start[a]
-      for (b in idx_u[idx_u > a]) {
-        lag <- cyc_start[b] - ca
-        if (lag < 1L) next
-        if (lag > max_lag) break            # cyc_start is increasing → no closer pairs beyond
-        ac_sums[lag] <- ac_sums[lag] + ux[a]*ux[b] + uy[a]*uy[b]
-        ac_n[lag]    <- ac_n[lag]    + 1L
-      }
-    }
-  }
-
-  all_angles <- unlist(angle_list, use.names = FALSE)
-
-  shiny::validate(shiny::need(length(all_angles) >= 10,
-    "Too few usable steps - lower 'Min points per TID', raise 'Max dark cycles', or relax filters."))
-
-  ac_vals  <- ifelse(ac_n > 0, ac_sums / ac_n, NA_real_)
-  lag_time <- if (have_cyc) seq_len(max_lag) * t_c else NA_real_   # ms, real elapsed time
-  list(angles = all_angles, ac = ac_vals, lags = seq_len(max_lag),
-       lag_time = lag_time, have_cyc = have_cyc, t_cycle = t_c, max_dark = max_dark,
-       r_noise = r_noise, sigma_loc = if (is.finite(r_noise)) sig_dir else NA_real_,
-       frac_below_noise = if (n_steps_tot > 0) n_below / n_steps_tot else NA_real_,
-       frac_dropped_dark = if (n_steps_tot > 0) n_dropped_dark / n_steps_tot else NA_real_)
+    res <- dir_compute(df, t_c, sig_dir, min_pts, max_dark, max_lag = 20L, progress = incProgress)
+    shiny::validate(shiny::need(!is.null(res),
+      "Too few usable steps - lower 'Min points per TID', raise 'Max dark cycles', or relax filters."))
+    res
   })  # withProgress
 })
 

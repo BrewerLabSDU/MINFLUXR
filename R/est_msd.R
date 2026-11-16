@@ -429,3 +429,130 @@ msd_headline <- function(df, t_c, sw = 0, window = c(5L, 50L), track_weight = TR
   list(D = fr$D, sigma = fr$sigma_loc, n_points = fr$n_points %||% NA_integer_, window = c(lo, hi),
        fit_lags = range(ens$lag[used]), fit_tau = range(tau[used]))
 }
+
+# ── msd_unified_curves() ──────────────────────────────────────────────────────
+# GOAL: everything the MSD panel plots and fits, from the per-track sums of
+# msd_track_sums(): per-track TAMSD, the ensemble curve (track- or pair-weighted),
+# its quartile band and median, the real and the linearised lag axes, and which
+# lags enough tracks reach. Moved unchanged out of msd_unified_bundle()
+# (server/tracking/15_msd.R).
+# sums         : result of msd_track_sums()
+# t_c, cc_sw   : cycle time and per-step overhead (ms)
+# max_lag      : number of cycle lags in `sums`
+# has_z        : whether z entered the squared displacements
+# drop_negd    : drop tracks whose TAMSD has a non-positive slope before averaging
+# track_weight : TRUE = mean of per-track TAMSDs (eMSD), FALSE = pair-weighted
+# d_eff        : effective dimensionality of the motion as observed (MSD = 2 d_eff D tau)
+# RETURNS list(lag, tau, tau_lin, msd, npairs, n_trk_lag, keep_lag, track_msd,
+#   tk_names, msd_q25, msd_q75, msd_med, t_cycle, has_z, ndim, d_eff, coef_eff,
+#   track_weighted, n_dropped_negD, n_tracks).
+msd_unified_curves <- function(sums, t_c, cc_sw = 0, max_lag, has_z = FALSE, drop_negd = FALSE,
+                               track_weight = FALSE, d_eff = if (has_z) 3 else 2) {
+  tk_names <- sums$tk_names
+  tk_dr2 <- sums$dr2; tk_np <- sums$np; tk_dt <- sums$dt
+
+  track_msd <- ifelse(tk_np > 0L, tk_dr2 / tk_np, NA_real_)   # per-track TAMSD (nm²)
+
+  # Drop non-positive-D tracks before the ensemble. OFF by default to match
+  # Bela's eDIFF, which keeps EVERY track (his D≤0 filter applies only to the
+  # per-track tDIFF, which we still enforce there). Toggle on for the previous
+  # QC behaviour.
+  n_dropped_negD <- 0L
+  if (isTRUE(drop_negd)) {
+    posD <- .track_positive_D(track_msd, seq_len(max_lag) * t_c)
+    n_dropped_negD <- if (any(posD) && !all(posD)) sum(!posD) else 0L
+    if (any(posD) && !all(posD)) {
+      track_msd <- track_msd[, posD, drop = FALSE]
+      tk_dr2    <- tk_dr2[, posD, drop = FALSE]
+      tk_np     <- tk_np[, posD, drop = FALSE]
+      tk_dt     <- tk_dt[, posD, drop = FALSE]
+      tk_names  <- tk_names[posD]
+    }
+  }
+  colnames(track_msd) <- tk_names
+
+  np_lag    <- rowSums(tk_np)
+  dr2_lag   <- rowSums(tk_dr2)
+  dt_lag    <- rowSums(tk_dt)
+  # Ensemble weighting: pair-weighted (default, smoother) or track-weighted
+  # (Vogler/Bela eMSD = mean of per-track TAMSDs).
+  msd_pair  <- if (track_weight) rowMeans(track_msd, na.rm = TRUE)
+               else ifelse(np_lag > 0, dr2_lag / np_lag, NA_real_)
+  tau_real  <- ifelse(np_lag > 0, dt_lag  / np_lag, seq_len(max_lag) * t_c)  # true mean Δt
+  n_trk_lag <- rowSums(!is.na(track_msd))
+  msd_q25   <- apply(track_msd, 1L, quantile, probs = 0.25, na.rm = TRUE)
+  msd_q75   <- apply(track_msd, 1L, quantile, probs = 0.75, na.rm = TRUE)
+  # Median of the same per-track TAMSDs, so the plotted band has a central line
+  # that is commensurable with it (the eMSD is a mean of a skewed distribution).
+  msd_med   <- apply(track_msd, 1L, stats::median, na.rm = TRUE)
+
+  min_trk <- max(2L, floor(0.10 * max(n_trk_lag)))
+  keep_lag <- n_trk_lag >= min_trk
+  # Linearized (Vogler/MinSpt) time axis = k·t_c + SW, matching his T_LIN exactly
+  # (simulate_cycles(k) = k·t_c + SW_OVERHEAD; get_cycle_time subtracts the SW).
+  # The +SW is a CONSTANT offset, so it does NOT change the fitted slope / D - it
+  # only shifts the curve right by SW and aligns the OLSF intercept (σ_loc) with his.
+  list(lag = seq_len(max_lag), tau = tau_real, tau_lin = seq_len(max_lag) * t_c + cc_sw,
+       msd = msd_pair,
+       npairs = np_lag, n_trk_lag = n_trk_lag, keep_lag = keep_lag,
+       track_msd = track_msd, tk_names = tk_names,
+       msd_q25 = msd_q25, msd_q75 = msd_q75, msd_med = msd_med,
+       t_cycle = t_c, has_z = has_z, ndim = if (has_z) 3L else 2L,
+       # MSD = 2*d_eff*D*tau. d_eff follows the MOTION and its projection, not the
+       # recorded coordinate count ; the caller supplies it.
+       d_eff = d_eff,
+       coef_eff = 2 * d_eff,
+       track_weighted = track_weight, n_dropped_negD = n_dropped_negD,
+       n_tracks = sum(colSums(tk_np) > 0))
+}
+
+# ── msd_pertrack_fits() ───────────────────────────────────────────────────────
+# GOAL: fit every track's own TAMSD over the fit window with the same OLSF as the
+# ensemble, and summarise the per-track D (the time-averaged D, tDIFF). Also the
+# confinement index of each track: late-window rise over early-window rise of its
+# MSD, relative to the same ratio of lag times (< 1 confined, ~1 Brownian, > 1
+# directed). Only tracks with D > 0 enter. Moved unchanged out of
+# trk_unified_tdiff() (server/tracking/15_msd.R).
+# ub         : result of msd_unified_curves()
+# min_lag, max_lag_e : fit window in cycles
+# use_iter   : iterative OLSF (TRUE) or anchored OLSF with Michalet's p_min
+# linear_tau : fit against the linearised lag axis (k t_c + SW) or the real mean dt
+# R_msd      : motion-blur coefficient per step
+# RETURNS list(tDIFF (um2/s), n_tD, sd_tD, ci_lo, ci_hi, med_tD, per_D, pertrack).
+msd_pertrack_fits <- function(ub, min_lag = 5L, max_lag_e = 50L, use_iter = TRUE, linear_tau = TRUE,
+                              R_msd = 0) {
+  tau_sel   <- if (isTRUE(linear_tau)) ub$tau_lin else ub$tau
+  win   <- ub$lag >= min_lag & ub$lag <= max_lag_e & is.finite(tau_sel)
+  tau_w <- tau_sel[win]; t_c_e <- ub$t_cycle
+  tids  <- if (!is.null(ub$tk_names)) ub$tk_names else as.character(seq_len(ncol(ub$track_msd)))
+  rows <- lapply(seq_len(ncol(ub$track_msd)), function(j) {
+    col <- ub$track_msd[, j]
+    mv  <- col[win]
+    okc <- is.finite(mv); if (sum(okc) < 3L) return(NULL)
+    tt <- tau_w[okc]; yy <- mv[okc]; N_tr <- sum(is.finite(col))
+    fr_tr <- if (use_iter)
+      msd_fit_olsf_iterative(tt, yy, ndim = ub$ndim, R = R_msd, dt_cycle = t_c_e, N = N_tr,
+                             coef_override = ub$coef_eff)
+    else
+      msd_fit_olsf(tt, yy, rep(1L, length(tt)), k = length(tt), ndim = ub$ndim,
+                   auto_pmin = TRUE, R = R_msd, Npts = N_tr, dt_cycle = t_c_e,
+                   coef_override = ub$coef_eff)
+    if (is.null(fr_tr) || !is.finite(fr_tr$D) || fr_tr$D <= 0) return(NULL)
+    # Confinement index: actual MSD growth vs the free-diffusion expectation,
+    # using the median of the first/last 15% of the windowed bins (robust to a
+    # noisy endpoint). CI < 1 confined, ~1 Brownian, > 1 directed.
+    n_ci <- length(tt); n_edge <- max(2L, floor(0.15 * n_ci))
+    tf <- median(tt[seq_len(n_edge)]); tl <- median(tt[seq(n_ci - n_edge + 1L, n_ci)])
+    mf <- median(yy[seq_len(n_edge)]); ml <- median(yy[seq(n_ci - n_edge + 1L, n_ci)])
+    ci <- if (is.finite(tf) && tf > 0 && is.finite(mf) && mf > 0 &&
+              is.finite(tl) && tl > tf && is.finite(ml)) (ml / mf) / (tl / tf) else NA_real_
+    data.frame(tid = tids[j], D_um2_s = fr_tr$D / 1e3, alpha = 1,
+               sigma_loc_nm = fr_tr$sigma_loc, conf_index = ci,
+               n_bins = sum(okc), stringsAsFactors = FALSE)
+  })
+  pertrack <- do.call(rbind, Filter(Negate(is.null), rows))
+  per_D <- if (!is.null(pertrack)) pertrack$D_um2_s else numeric(0)
+  ci <- .mean_ci(per_D)   # track-level SD + 95% CI on the per-track-mean D
+  list(tDIFF = ci$mean, n_tD = ci$n, sd_tD = ci$sd, ci_lo = ci$lo, ci_hi = ci$hi,
+       med_tD = ci$median, per_D = per_D, pertrack = pertrack)
+}

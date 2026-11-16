@@ -86,19 +86,8 @@ cycle_class_bundle <- eventReactive(input$trk_tsa_run, {
   shiny::validate(shiny::need(is.finite(t_c) && t_c > 0, "Could not determine cycle time."))
   hw_used <- { hw <- trk_hw_cycle_time(); is.finite(hw) && hw > 0 }
 
-  n_cyc      <- pmax(1L, as.integer(round(vec / t_c)))
-  n_total    <- length(n_cyc)
-  n_integ    <- sum(n_cyc == 1L)
-  n_dark_int <- sum(n_cyc >= 2L)           # intervals containing ≥1 dark cycle
-  dark_cycles_total <- sum(n_cyc - 1L)     # total dark cycles across all intervals
-  frac_integ <- n_integ / n_total
-
   max_disp <- max(5L, as.integer(input$trk_cycle_dark_max %||% 20L))
-  tab      <- tabulate(pmin(n_cyc, max_disp), nbins = max_disp)
-  list(t_cycle = t_c, n_cyc = n_cyc, counts = tab, max_disp = max_disp,
-       n_total = n_total, n_integ = n_integ, n_dark_int = n_dark_int,
-       dark_cycles_total = dark_cycles_total, frac_integ = frac_integ,
-       hw_used = hw_used)
+  c(cycle_class_counts(vec, t_c, max_disp), list(hw_used = hw_used))   # R/trk_stats.R
   })  # withProgress
 })
 

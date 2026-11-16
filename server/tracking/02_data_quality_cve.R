@@ -115,16 +115,7 @@ trk_cve_bundle <- eventReactive(input$trk_cve_run, {
   # Same integrated fraction, but on the FULLY-FILTERED data (post quality-gate /
   # end-trim / length / duration / spatial) - the data the analyses actually use.
   # Lets the panel show raw → after-filters and whether the filters helped.
-  frac_integ_of <- function(d) {
-    if (is.null(d) || !nrow(d) || !all(c("tid","tim") %in% names(d))) return(NA_real_)
-    d <- d[order(d$tid, d$tim), ]; m <- nrow(d)
-    sm  <- c(FALSE, d$tid[-1] == d$tid[-m])
-    dtt <- c(NA_real_, diff(d$tim)); dtt[!sm] <- NA_real_
-    nc  <- if (is.finite(t_c) && t_c > 0) round(dtt / t_c) else rep(1L, m)
-    isi <- sm & is.finite(nc) & (nc == 1L); isi[is.na(isi)] <- FALSE
-    ns  <- sum(sm, na.rm = TRUE)
-    if (ns > 0) sum(isi) / ns else NA_real_
-  }
+  frac_integ_of <- function(d) cve_integrated_fraction(d, t_c)             # R/est_cve.R
   frac_integ_filt <- frac_integ_of(tryCatch(trk_spatial_filtered(), error = function(e) NULL))
   # RAW reference = TRUE frozen upload data (never filtered / rechunked), NOT df
   # (= trk_gap_split, which reads the current - possibly filtered - manifest). This
@@ -135,15 +126,7 @@ trk_cve_bundle <- eventReactive(input$trk_cve_run, {
   # continuity gate) on TRUE RAW (frozen upload) vs ANALYZED (filtered). This reflects
   # the dark-cycle tolerance, so a dataset with many gentle 1–2-cycle gaps scores
   # higher than its bare integrated fraction.
-  cont_of <- function(d, H) {
-    if (is.null(d) || !nrow(d) || !all(c("tid","tim") %in% names(d))) return(NA_real_)
-    d <- d[order(d$tid, d$tim), ]; m <- nrow(d)
-    sm  <- c(FALSE, d$tid[-1] == d$tid[-m])
-    dtt <- c(NA_real_, diff(d$tim)); dtt[!sm] <- NA_real_
-    kk  <- pmax(1L, as.integer(round(dtt / t_c)))
-    ww  <- if (is.finite(H) && H > 0) 2^(-(kk - 1) / H) else as.numeric(kk == 1L)
-    if (sum(sm, na.rm = TRUE) > 0) mean(ww[sm], na.rm = TRUE) else NA_real_
-  }
+  cont_of <- function(d, H) cve_continuity_mean(d, t_c, H)                 # R/est_cve.R
   H_disp    <- suppressWarnings(as.numeric(input$trk_quality_darktol %||% 3))
   cont_raw  <- cont_of(tryCatch(trk_raw_original(), error = function(e) NULL), H_disp)  # TRUE raw (frozen at upload)
   cont_filt <- cont_of(tryCatch(trk_spatial_filtered(), error = function(e) NULL), H_disp)  # analyzed (live filtered)

@@ -100,3 +100,24 @@ compute_cycle_stats <- function(df, t_c) {
        max_cyc    = max(n_cyc))
 }
 
+# ── cycle_class_counts() ──────────────────────────────────────────────────────
+# GOAL: classify every within-track time step by the number of acquisition cycles
+# it spans (the time-signature analysis). n_cyc = round(dt / t_c), at least 1;
+# 1 = "integrated" (a localization every cycle), k >= 2 = k - 1 dark cycles.
+# vec      : positive, finite step durations (ms), all tracks pooled
+# t_c      : cycle time (ms)
+# max_disp : steps spanning more cycles are counted in the last bin
+# RETURNS list(t_cycle, n_cyc, counts (per cycle count, length max_disp),
+#   max_disp, n_total, n_integ, n_dark_int, dark_cycles_total, frac_integ).
+cycle_class_counts <- function(vec, t_c, max_disp = 20L) {
+  n_cyc      <- pmax(1L, as.integer(round(vec / t_c)))
+  n_total    <- length(n_cyc)
+  n_integ    <- sum(n_cyc == 1L)
+  n_dark_int <- sum(n_cyc >= 2L)           # intervals containing ≥1 dark cycle
+  dark_cycles_total <- sum(n_cyc - 1L)     # total dark cycles across all intervals
+  frac_integ <- n_integ / n_total
+  tab      <- tabulate(pmin(n_cyc, max_disp), nbins = max_disp)
+  list(t_cycle = t_c, n_cyc = n_cyc, counts = tab, max_disp = max_disp,
+       n_total = n_total, n_integ = n_integ, n_dark_int = n_dark_int,
+       dark_cycles_total = dark_cycles_total, frac_integ = frac_integ)
+}

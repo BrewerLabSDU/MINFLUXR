@@ -469,63 +469,11 @@ msd_unified_bundle <- eventReactive(input$trk_msd_compute, {
   # on a single cell.
   sums <- withProgress(message = "Computing MSD…", value = 0.5,
                        msd_track_sums(df, t_c, cc_sw, max_lag, min_pts, has_z))
-  tk_names <- sums$tk_names
-  tk_dr2 <- sums$dr2; tk_np <- sums$np; tk_dt <- sums$dt
-
-  track_msd <- ifelse(tk_np > 0L, tk_dr2 / tk_np, NA_real_)   # per-track TAMSD (nm²)
-
-  # Drop non-positive-D tracks before the ensemble. OFF by default to match
-  # Bela's eDIFF, which keeps EVERY track (his D≤0 filter applies only to the
-  # per-track tDIFF, which we still enforce there). Toggle on for the previous
-  # QC behaviour.
-  n_dropped_negD <- 0L
-  if (isTRUE(input$trk_uni_drop_negd)) {
-    posD <- .track_positive_D(track_msd, seq_len(max_lag) * t_c)
-    n_dropped_negD <- if (any(posD) && !all(posD)) sum(!posD) else 0L
-    if (any(posD) && !all(posD)) {
-      track_msd <- track_msd[, posD, drop = FALSE]
-      tk_dr2    <- tk_dr2[, posD, drop = FALSE]
-      tk_np     <- tk_np[, posD, drop = FALSE]
-      tk_dt     <- tk_dt[, posD, drop = FALSE]
-      tk_names  <- tk_names[posD]
-    }
-  }
-  colnames(track_msd) <- tk_names
-
-  np_lag    <- rowSums(tk_np)
-  dr2_lag   <- rowSums(tk_dr2)
-  dt_lag    <- rowSums(tk_dt)
-  # Ensemble weighting: pair-weighted (default, smoother) or track-weighted
-  # (Vogler/Bela eMSD = mean of per-track TAMSDs).
-  track_weight <- isolate(isTRUE(input$trk_uni_track_weight))
-  msd_pair  <- if (track_weight) rowMeans(track_msd, na.rm = TRUE)
-               else ifelse(np_lag > 0, dr2_lag / np_lag, NA_real_)
-  tau_real  <- ifelse(np_lag > 0, dt_lag  / np_lag, seq_len(max_lag) * t_c)  # true mean Δt
-  n_trk_lag <- rowSums(!is.na(track_msd))
-  msd_q25   <- apply(track_msd, 1L, quantile, probs = 0.25, na.rm = TRUE)
-  msd_q75   <- apply(track_msd, 1L, quantile, probs = 0.75, na.rm = TRUE)
-  # Median of the same per-track TAMSDs, so the plotted band has a central line
-  # that is commensurable with it (the eMSD is a mean of a skewed distribution).
-  msd_med   <- apply(track_msd, 1L, stats::median, na.rm = TRUE)
-
-  min_trk <- max(2L, floor(0.10 * max(n_trk_lag)))
-  keep_lag <- n_trk_lag >= min_trk
-  # Linearized (Vogler/MinSpt) time axis = k·t_c + SW, matching his T_LIN exactly
-  # (simulate_cycles(k) = k·t_c + SW_OVERHEAD; get_cycle_time subtracts the SW).
-  # The +SW is a CONSTANT offset, so it does NOT change the fitted slope / D - it
-  # only shifts the curve right by SW and aligns the OLSF intercept (σ_loc) with his.
-  list(lag = seq_len(max_lag), tau = tau_real, tau_lin = seq_len(max_lag) * t_c + cc_sw,
-       msd = msd_pair,
-       npairs = np_lag, n_trk_lag = n_trk_lag, keep_lag = keep_lag,
-       track_msd = track_msd, tk_names = tk_names,
-       msd_q25 = msd_q25, msd_q75 = msd_q75, msd_med = msd_med,
-       t_cycle = t_c, has_z = has_z, ndim = if (has_z) 3L else 2L,
-       # MSD = 2*d_eff*D*tau. d_eff follows the MOTION and its projection, not the
-       # recorded coordinate count -- see .msd_d_eff.
-       d_eff = .msd_d_eff(if (has_z) 3L else 2L),
-       coef_eff = 2 * .msd_d_eff(if (has_z) 3L else 2L),
-       track_weighted = track_weight, n_dropped_negD = n_dropped_negD,
-       n_tracks = sum(colSums(tk_np) > 0))
+  # Per-track TAMSD, the ensemble curve and its band: msd_unified_curves(), R/est_msd.R.
+  msd_unified_curves(sums, t_c, cc_sw, max_lag, has_z,
+                     drop_negd = isTRUE(input$trk_uni_drop_negd),
+                     track_weight = isolate(isTRUE(input$trk_uni_track_weight)),
+                     d_eff = .msd_d_eff(if (has_z) 3L else 2L))
 })
 
 # ── Free-diffusion-on-a-geometry MSD reference ──────────────────────────────
@@ -680,41 +628,9 @@ trk_unified_tdiff <- reactive({
   if (is.null(ub) || is.null(ub$track_msd) || ncol(ub$track_msd) == 0L) return(NULL)
   min_lag   <- max(1L, as.integer(input$trk_uni_min_lag %||% 4L))
   max_lag_e <- max(min_lag + 2L, as.integer(input$trk_uni_max_lag %||% 50L))
-  use_iter  <- isTRUE(input$trk_uni_iterative)
-  tau_sel   <- if (isTRUE(input$trk_uni_linear_tau)) ub$tau_lin else ub$tau
-  win   <- ub$lag >= min_lag & ub$lag <= max_lag_e & is.finite(tau_sel)
-  tau_w <- tau_sel[win]; t_c_e <- ub$t_cycle
-  tids  <- if (!is.null(ub$tk_names)) ub$tk_names else as.character(seq_len(ncol(ub$track_msd)))
-  rows <- lapply(seq_len(ncol(ub$track_msd)), function(j) {
-    col <- ub$track_msd[, j]
-    mv  <- col[win]
-    okc <- is.finite(mv); if (sum(okc) < 3L) return(NULL)
-    tt <- tau_w[okc]; yy <- mv[okc]; N_tr <- sum(is.finite(col))
-    fr_tr <- if (use_iter)
-      msd_fit_olsf_iterative(tt, yy, ndim = ub$ndim, R = trk_blur()$R_msd, dt_cycle = t_c_e, N = N_tr,
-                             coef_override = ub$coef_eff)
-    else
-      msd_fit_olsf(tt, yy, rep(1L, length(tt)), k = length(tt), ndim = ub$ndim,
-                   auto_pmin = TRUE, R = trk_blur()$R_msd, Npts = N_tr, dt_cycle = t_c_e,
-                   coef_override = ub$coef_eff)
-    if (is.null(fr_tr) || !is.finite(fr_tr$D) || fr_tr$D <= 0) return(NULL)
-    # Confinement index: actual MSD growth vs the free-diffusion expectation,
-    # using the median of the first/last 15% of the windowed bins (robust to a
-    # noisy endpoint). CI < 1 confined, ~1 Brownian, > 1 directed.
-    n_ci <- length(tt); n_edge <- max(2L, floor(0.15 * n_ci))
-    tf <- median(tt[seq_len(n_edge)]); tl <- median(tt[seq(n_ci - n_edge + 1L, n_ci)])
-    mf <- median(yy[seq_len(n_edge)]); ml <- median(yy[seq(n_ci - n_edge + 1L, n_ci)])
-    ci <- if (is.finite(tf) && tf > 0 && is.finite(mf) && mf > 0 &&
-              is.finite(tl) && tl > tf && is.finite(ml)) (ml / mf) / (tl / tf) else NA_real_
-    data.frame(tid = tids[j], D_um2_s = fr_tr$D / 1e3, alpha = 1,
-               sigma_loc_nm = fr_tr$sigma_loc, conf_index = ci,
-               n_bins = sum(okc), stringsAsFactors = FALSE)
-  })
-  pertrack <- do.call(rbind, Filter(Negate(is.null), rows))
-  per_D <- if (!is.null(pertrack)) pertrack$D_um2_s else numeric(0)
-  ci <- .mean_ci(per_D)   # track-level SD + 95% CI on the per-track-mean D
-  list(tDIFF = ci$mean, n_tD = ci$n, sd_tD = ci$sd, ci_lo = ci$lo, ci_hi = ci$hi,
-       med_tD = ci$median, per_D = per_D, pertrack = pertrack)
+  # The per-track fits and their summary: msd_pertrack_fits(), R/est_msd.R.
+  msd_pertrack_fits(ub, min_lag, max_lag_e, use_iter = isTRUE(input$trk_uni_iterative),
+                    linear_tau = isTRUE(input$trk_uni_linear_tau), R_msd = trk_blur()$R_msd)
 })
 
 # Per-cluster diffusion summary (cached): eDIFF from the cluster eMSD fit (same

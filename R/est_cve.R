@@ -239,3 +239,37 @@ TCP_PATTERN_DEFAULT <- "hexagon"
   }
   base * B * off
 }
+
+# ── Dataset-level timing scores for the Data Quality panel ────────────────────
+# Moved unchanged out of trk_cve_bundle() (server/tracking/02_data_quality_cve.R),
+# where they were local functions. They are computed on three versions of the
+# data (raw upload, cleaned, fully filtered) to show what the cleaning changed.
+
+# GOAL: the fraction of within-track steps that span exactly one acquisition
+# cycle ("integrated" steps). NA when there is no data. With no usable cycle
+# time every step counts as integrated.
+# d : data.frame(tid, tim), tim in ms; t_c : cycle time (ms)
+cve_integrated_fraction <- function(d, t_c) {
+  if (is.null(d) || !nrow(d) || !all(c("tid","tim") %in% names(d))) return(NA_real_)
+  d <- d[order(d$tid, d$tim), ]; m <- nrow(d)
+  sm  <- c(FALSE, d$tid[-1] == d$tid[-m])
+  dtt <- c(NA_real_, diff(d$tim)); dtt[!sm] <- NA_real_
+  nc  <- if (is.finite(t_c) && t_c > 0) round(dtt / t_c) else rep(1L, m)
+  isi <- sm & is.finite(nc) & (nc == 1L); isi[is.na(isi)] <- FALSE
+  ns  <- sum(sm, na.rm = TRUE)
+  if (ns > 0) sum(isi) / ns else NA_real_
+}
+
+# GOAL: the dataset mean of the per-step continuity weight 2^(-(k-1)/H), k = cycles
+# spanned by a step (the weighting of the continuity gate, continuity_scores() in
+# est_clean.R, taken over all steps instead of per track). H = dark-cycle
+# half-life; H 0 or NA gives the plain integrated fraction.
+cve_continuity_mean <- function(d, t_c, H) {
+  if (is.null(d) || !nrow(d) || !all(c("tid","tim") %in% names(d))) return(NA_real_)
+  d <- d[order(d$tid, d$tim), ]; m <- nrow(d)
+  sm  <- c(FALSE, d$tid[-1] == d$tid[-m])
+  dtt <- c(NA_real_, diff(d$tim)); dtt[!sm] <- NA_real_
+  kk  <- pmax(1L, as.integer(round(dtt / t_c)))
+  ww  <- if (is.finite(H) && H > 0) 2^(-(kk - 1) / H) else as.numeric(kk == 1L)
+  if (sum(sm, na.rm = TRUE) > 0) mean(ww[sm], na.rm = TRUE) else NA_real_
+}

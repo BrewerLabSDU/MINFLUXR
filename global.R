@@ -34,6 +34,7 @@ source("R/trk_playback.R")     # play-loop timing, colour scales, dwell heatmap
 source("R/trk_msd_extras.R")   # MSD fit-window mask, nls model fit, D_max
 source("R/trk_geometry.R")     # cell-geometry labels
 source("R/est_transport.R")    # per-track speed, drift velocity, local alpha
+source("R/est_directionality.R")  # turning angles, direction autocorrelation
 # The simulator's generators (no Shiny state), moved out of sim_server().
 source("R/sim_acquisition.R")  # detection-rate model, calibration from a real run
 source("R/sim_structures.R")   # ground-truth structure generators
