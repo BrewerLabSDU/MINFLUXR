@@ -7,7 +7,8 @@
 ##   Everything behind the SMLM (imaging) tab: load localization data, filter it,
 ##   group it into molecules and structures, and run the spatial analyses
 ##   (nearest neighbour, Ripley, clustering, shape fitting, two-colour
-##   co-localization, ground-truth estimation). One large Shiny server function.
+##   co-localization, ground-truth estimation). One Shiny server function,
+##   assembled from the part files in server/smlm/ (section 3).
 ##
 ##   The Tracking tab asks how molecules MOVE. This tab asks where they ARE and
 ##   how they are ARRANGED.
@@ -62,24 +63,50 @@
 ##   because de-blinking assigns every trace (see deblink_assign_singletons).
 ##   (Implementation: apply_clustering_pipeline() in R/smlm_clustering.R.)
 ##
-## ── 3. MAP OF THE ANALYSES (grep the name; line numbers drift) ───────────────
-##   Upload & settings ......... uploaded_df, get_ui_settings, raw_df, df_full_raw
-##   Filter pipeline ........... metadata_filtered_df / spread_filtered_df /
-##                               filtered_df   (+ the sd_* trace-spread helpers)
-##   Analysis-ready data ....... plottable_data
-##   Nearest neighbour ......... nn_table, nn_table_cluster2, secondary_nn_lines,
-##                               nn_batch_filtered (batch across files/channels)
-##   Two-colour / multiplex .... mplex_split_active, mplex_cross_pair,
-##                               cross_dcr_nn_table
-##   Ground-truth estimate ..... gt_estimate, gt_morphology   [EXPLORATORY]
-##   Cluster viewer / shapes ... viewer_ids, viewer_current, viewer_fit_core,
-##                               viewer_fit                    [EXPLORATORY]
-##   Dataset groups ............ file_group_map, group_color_map
-##   Image overlay ............. confocal_meta, image_overlay
+## ── 3. WHERE THE CODE IS ─────────────────────────────────────────────────────
+##   This file only assembles smlm_server(). Its body is in server/smlm/, one
+##   panel or core concern per part file, evaluated in this order in the server
+##   function's environment (server/parts.R, server/README.md). Each part's
+##   header lists what it defines for the others and what it reads from them.
 ##
-##   The heavy spatial statistics themselves (Ripley L/L12, PCF, KDE
-##   co-localization, RoG, batch NN) live in R/smlm_*.R - this file wires
-##   them to inputs and outputs.
+##   01_view_upload.R                   view state, 3D rotate/record, file upload
+##   02_multiplex.R                     multiplexed MINFLUX: build, align, save
+##   03_dataset_zcal.R                  active dataset, axial calibration, filter reset on new data
+##   04_settings_collect_apply.R        collect the settings for saving; defaults and apply functions
+##   05_filter_pipeline.R               THE FILTER PIPELINE of the active file
+##   06_settings_download.R             download the main and the Median Clustering settings files
+##   07_deblink_tuning.R                tuning aids for de-blinking and Median Clustering
+##   08_settings_load_reset.R           load and reset settings; filtered CSV export
+##   09_trace_spread.R                  trace spread inspection panel
+##   10_triggers_stores.R               plot trigger and small result stores
+##   11_dcr_split.R                     two-colour split by DCR
+##   12_metadata_histogram.R            metadata histogram and Median Cluster NN table
+##   13_image_overlay.R                 confocal image overlay
+##   14_gt_estimator.R                  ground-truth estimate (exploratory)
+##   15_scatter2d.R                     main 2D plot
+##   16_crop_range_ui.R                 3D crop controls and the metadata range sliders
+##   17_plottable_data.R                plottable_data: THE analysis-ready data of the active file
+##   18_nn_tables.R                     nearest-neighbour tables and their downloads
+##   19_scatter3d.R                     main 3D plot
+##   20_dataset_groups.R                dataset groups and the per-file summary
+##   21_density_normalisation.R         labelling-density profile and thinning
+##   22_spatial_window.R                observation window of the spatial statistics
+##   23_prepared_cache.R                prepared_df: THE analysis-ready data of any file (batch chain)
+##   24_batch_nn.R                      panel: batch nearest-neighbour histogram
+##   25_counts_detection_time.R         panels: traces per cluster, detection over time
+##   26_precision_cloud.R               panel: precision cloud and sample stability
+##   27_fiducial_qc.R                   panel: fiducial scan and exclusion
+##   28_crowding_size_nn.R              panels: crowding versus detection time, NN versus cluster size
+##   29_cluster_viewer.R                panel: cluster viewer and shape fit (exploratory)
+##   30_radius_gyration.R               panel: radius of gyration
+##   31_ripley_pcf.R                    panels: Ripley L and pair correlation g(r)
+##   32_hotspots.R                      panel: hotspots (local density enhancement)
+##   33_panel_grid.R                    figure grid
+##   34_two_colour.R                    panels: two-colour statistics
+##
+##   The statistics themselves (Ripley L/L12, PCF, KDE co-localization, RoG,
+##   batch NN, clustering) live in R/smlm_*.R; the parts wire them to inputs
+##   and outputs. To find a reactive by name: Rscript tools/server_map.R out/
 ##
 ## ── 4. CONVENTIONS & GOTCHAS ─────────────────────────────────────────────────
 ##   * Units: nanometres. `tim` stays in SECONDS here (the Tracking tab converts

@@ -1,3 +1,25 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/tracking/18_confinement_displacement.R  -  panels: confinement index; displacement versus diffusion
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of tracking_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## The MSD confinement index with its free-diffusion null, and net
+## displacement against the free and geometry-aware nulls.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     (nothing)
+##   READS from other parts:
+##     01_state_sigma: trk_sigma_loc_eff, trk_sigma_loc_src
+##     02_data_quality_cve: trk_cve_bundle
+##     07_cycle_time_sequence: trk_blur, trk_cycle_time
+##     11_data_frames: trk
+##     15_msd: .geom_for_null, msd_unified_bundle, msd_unified_modelfit,
+##             trk_unified_tdiff
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ============================================================================
 # conf_ci_bundle() - PER-TRACK CONFINEMENT FROM THE MSD SHAPE (CI + simulated null)
 # ============================================================================

@@ -1,3 +1,24 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/24_batch_nn.R  -  panel: batch nearest-neighbour histogram
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Run handler, filtered view, figure, statistics and download.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     build_nn_batch_hist_fig, nn_batch_params_live, nn_batch_results
+##   READS from other parts:
+##     01_view_upload: smlm_file_store, uploaded_df_rv
+##     02_multiplex: mplex_split_active
+##     20_dataset_groups: apply_dataset_groups, file_group_map, file_palette
+##     21_density_normalisation: apply_density_thinning
+##     23_prepared_cache: resolve_unit
+##     27_fiducial_qc: qc_exclude_from
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ------ Batch NN Distance Histogram ----------------------------------------
 nn_batch_results <- reactiveVal(NULL)
 nn_batch_params  <- reactiveVal(NULL)   # RESOLVED compute params, frozen at Run

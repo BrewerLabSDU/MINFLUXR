@@ -1,3 +1,25 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/32_hotspots.R  -  panel: hotspots (local density enhancement)
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Run handler, status, map, ECDF, per-file metric and density plots, table
+## and downloads.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     build_hotspot_density_fig, build_hotspot_ecdf_fig,
+##     build_hotspot_map_fig, build_hotspot_metric_fig, spatial_outline_pts
+##   READS from other parts:
+##     01_view_upload: smlm_file_store
+##     20_dataset_groups: file_group_map, series_palette
+##     22_spatial_window: spatial_gate_close, spatial_report_windows,
+##                        spatial_support_of
+##     23_prepared_cache: .stale_badge, prepared_df, resolve_unit
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 ## ══════════════════════════════════════════════════════════════════════════
 ## LOCAL DENSITY & HOTSPOTS
 ## ══════════════════════════════════════════════════════════════════════════

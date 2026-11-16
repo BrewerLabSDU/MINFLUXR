@@ -1,3 +1,21 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/tracking/20_speed_transport.R  -  panel: speed and transport
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of tracking_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Per-track drift velocity and local alpha (R/est_transport.R), the
+## population export summary, plots and downloads.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     (nothing)
+##   READS from other parts:
+##     01_state_sigma: speed_ran, trk_sigma_loc_eff
+##     11_data_frames: trk
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # Effective σ_loc for the speed/transport noise floor: the user's field if set
 # (> 0), else the app-wide value (unified MSD / manual), else 0. Keeps the drift
 # noise floor √2σ/W and the α de-bias consistent with the rest of the app.

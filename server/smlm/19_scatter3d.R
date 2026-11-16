@@ -1,3 +1,26 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/19_scatter3d.R  -  main 3D plot
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## output$scatter3D: one render function. It also fits the shapes and
+## isosurfaces it draws and fills the Median Cluster table store.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     (nothing)
+##   READS from other parts:
+##     03_dataset_zcal: uploaded_df
+##     10_triggers_stores: cluster2_iso_diag, cluster2_table_store,
+##                         fit_log_rv, iso_geom, iso_mesh_cache, plot_trigger
+##     14_gt_estimator: gt_estimate
+##     16_crop_range_ui: add_3d_crop_preview, data
+##     17_plottable_data: plottable_data
+##     18_nn_tables: secondary_nn_lines
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 output$scatter3D <- renderPlotly({
   req(input$file)
   req(plot_trigger(), input$mode3d == "3D")

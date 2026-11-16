@@ -1,3 +1,20 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/sim/03_real_run_calibration.R  -  calibrate the acquisition model from a real run
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of sim_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Reading a real file, the quality gate, and pushing the measured rates into
+## the acquisition controls.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     sim_real_rv
+##   READS from other parts:
+##     (nothing)
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ── Calibrate from a real MINFLUX run ────────────────────────────────────────
 # Load a .npy / .json / .csv run, measure its detection-rate profile, duration
 # and FOV, pre-fill the Acquisition inputs, and keep the measured rate curve to

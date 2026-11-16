@@ -1,3 +1,22 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/09_trace_spread.R  -  trace spread inspection panel
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Per-trace spread tables, the spread range controls and their histograms, by
+## channel.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     sd_grey_tbl
+##   READS from other parts:
+##     03_dataset_zcal: uploaded_df
+##     05_filter_pipeline: filtered_df, sd_filt
+##     12_metadata_histogram: raw_df
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # --------- 7) Trace spread inspection  ----------
 sd_grey_tbl <- reactive({
   sd_by_tid(raw_df(), min_n = input$sd_min_locs)

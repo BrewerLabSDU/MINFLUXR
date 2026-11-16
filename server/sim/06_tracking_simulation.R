@@ -1,3 +1,20 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/sim/06_tracking_simulation.R  -  tracking simulation
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of sim_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Calibration from a real tracking file, sim_trk_result, the check estimates
+## and the exports.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     (nothing)
+##   READS from other parts:
+##     (nothing)
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ══════════════════════════════════════════════════════════════════════════
 # Diffusion / Tracking ground-truth simulator (Phase 1)
 # See docs/simulation_module.md. Free surface Brownian on a sphere or rod,

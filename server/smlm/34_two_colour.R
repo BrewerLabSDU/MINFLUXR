@@ -1,3 +1,26 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/34_two_colour.R  -  panels: two-colour statistics
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Cross-channel NN, bivariate Ripley L12, pair cross-correlation g12 and the
+## KDE co-localization map.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     build_coloc_curve_fig, build_cross_nn_hist_fig,
+##     build_kde_coloc_plot_fig, build_pcf12_plot_fig, build_ripley12_plot_fig,
+##     cross_nn_results
+##   READS from other parts:
+##     01_view_upload: smlm_file_store
+##     02_multiplex: mplex_cross_pair
+##     22_spatial_window: spatial_gate_close, spatial_report_windows,
+##                        spatial_support_of
+##     23_prepared_cache: cluster2_label, deblink_label
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ── Two-Color: Cross-Channel NN ──────────────────────────────────────────
 cross_nn_results <- reactiveVal(NULL)
 

@@ -1,3 +1,19 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/sim/04_compare_strategies.R  -  compare labelling strategies
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of sim_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## compare_result: the same ground truth labelled two ways.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     compare_result
+##   READS from other parts:
+##     02_smlm_simulation: sim_result
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ── Compare-strategies reactive ─────────────────────────────────────────────
 # Applies two labeling strategies to the same GT from sim_result().
 # Geometry is NOT re-run; seeds come from current label_seed + offsets.

@@ -1,3 +1,24 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/12_metadata_histogram.R  -  metadata histogram and Median Cluster NN table
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## The filter histogram, the nearest-neighbour table between Median Clusters,
+## and the second filter-reset observer for a new dataset.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     nn_table_cluster2, raw_df
+##   READS from other parts:
+##     01_view_upload: uploaded_df_rv
+##     03_dataset_zcal: uploaded_df
+##     05_filter_pipeline: filtered_df
+##     11_dcr_split: hist_channels_df
+##     17_plottable_data: plottable_data
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ------ HISTOGRAM for filters
 output$metadata_histogram <- renderPlotly({
   req(input$show_metadata_hist, input$hist_variable, uploaded_df_rv())

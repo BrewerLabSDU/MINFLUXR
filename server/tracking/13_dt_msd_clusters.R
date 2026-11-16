@@ -1,3 +1,25 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/tracking/13_dt_msd_clusters.R  -  dt histogram; MSD export and MSD clusters
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of tracking_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Per-track dt vectors and their histogram, the MSD export table, and
+## clustering tracks by their MSD with a motion model per cluster.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     dt_vectors, msd_cluster_rv, msd_export, msd_pertk_fits
+##   READS from other parts:
+##     01_state_sigma: tsa_ran
+##     07_cycle_time_sequence: trk_blur, trk_cluster_cycle, trk_cycle_time,
+##                             trk_hw_cycle_time, trk_regression_cycle
+##     10_triggers: cluster_color_map_stored, fire_frames
+##     11_data_frames: trk
+##     15_msd: msd_unified_bundle, msd_unified_fit, trk_unified_tdiff
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # --- dt extraction per TID (based on raw 'tim') --------------------------
 dt_vectors <- reactive({
   df <- trk(); req(nrow(df) > 0)

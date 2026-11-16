@@ -1,3 +1,21 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/14_gt_estimator.R  -  ground-truth estimate (exploratory)
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Counting-standard calibration, the inverse labelling-aware position
+## estimate and the per-structure morphology readout.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     add_gt_overlay_2d, gt_estimate
+##   READS from other parts:
+##     01_view_upload: smlm_file_store
+##     17_plottable_data: plottable_data
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # --- Main 2D plot -----------------------------------------------------------
 
 # Shared "exploratory + references" footer for the GT / shape read-outs.

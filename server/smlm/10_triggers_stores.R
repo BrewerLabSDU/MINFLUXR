@@ -1,3 +1,23 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/10_triggers_stores.R  -  plot trigger and small result stores
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## plot_trigger (what makes plottable_data recompute), diagnostics and
+## isosurface stores, the fit log, and the observers that tie display switches
+## to a replot.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     cluster2_iso_diag, cluster2_table_store, fit_log_rv, iso_geom,
+##     iso_mesh_cache, plot_trigger, smlm_diag, smlm_diag_mats
+##   READS from other parts:
+##     01_view_upload: uploaded_df_rv
+##     17_plottable_data: plottable_data
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # --------- 8) TRIGGERS & STORES ----------
 plot_trigger <- reactiveVal(NULL)
 smlm_diag      <- reactiveVal(NULL)   # list(data_clusters, img_blobs) in data coords

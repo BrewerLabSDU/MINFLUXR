@@ -8,7 +8,8 @@
 ##   Everything behind the "MINFLUXR - Tracking" tab: load a MINFLUX
 ##   single-particle-tracking dataset, clean it, animate it, and run the
 ##   diffusion analyses (MSD, CVE, JDD, HMM, confinement, D-map, ...).
-##   It is one large Shiny server function, `tracking_server()`.
+##   It is one Shiny server function, `tracking_server()`, assembled from the
+##   part files in server/tracking/ (section 3).
 ##
 ## HOW TO READ A SHINY SERVER FILE
 ##   Reactives are LAZY: the order they appear in the file is NOT the order they
@@ -23,7 +24,7 @@
 ##        v
 ##   trk_raw_df ................ loads EVERY chunk of the current manifest
 ##        v
-##   ---- THE FILTER PIPELINE (each stage feeds the next; ~line 1171) ----------
+##   ---- THE FILTER PIPELINE (each stage feeds the next; 06_filter_pipeline.R) -
 ##   trk_gap_split ............. Stage 1  cut tracks at dark-cycle gaps
 ##   trk_end_trimmed ........... Stage 2  peel dim / gap-reached track ends
 ##   trk_quality_filtered ...... Stage 3  drop dark-cycle-heavy tracks
@@ -101,25 +102,40 @@
 ##
 ##   UNITS: nm and ms internally. D in nm²/ms; divide by 1e3 for µm²/s.
 ##
-## ── 3. MAP OF THE FILE (grep the name; line numbers drift, names do not) ─────
-##   Setup / state ............. reactiveValues + reactiveVal block, top
-##   sigma_loc (noise floor) ... trk_sigma_loc_eff, trk_sigma_loc_src
-##   Calibration (CVE) ......... trk_cve_bundle          ~154
-##   Upload & chunking ......... trk_raw_df, trk_raw_original ~870
-##   FILTER PIPELINE ........... banner at                ~1171
-##   Cycle time & TSA .......... banner at                ~1382
-##   Playback / animation ...... seq_data, frames_store   ~2925
-##   MSD (main engine) ......... msd_unified_bundle       ~6202
-##     per-track D / ergodicity  trk_unified_tdiff        ~6410
-##   Change-point + GMM ........ cpd_segments_rv          ~4616
-##   Jump-distance (JDD) ....... jdd_bundle               ~7078
-##   Confinement index (MSD) ... conf_ci_bundle           ~8060
-##     (the Rg/Rmax shape test was retired 2026-08-03 -> retired_tracking_server.R)
-##   Directionality ............ dir_bundle               ~7627
-##   Speed & transport ......... trk_export_summary       ~7978
-##   Diffusion-state HMM ....... hmm_bundle               ~8298
-##   Per-state MSD ............. seg_msd_rv               ~8826
-##   Spatial D-map ............. dmap_bundle              ~8982
+## ── 3. WHERE THE CODE IS ─────────────────────────────────────────────────────
+##   This file only assembles tracking_server(). Its body is in server/tracking/,
+##   one panel or core concern per part file, evaluated in this order in the
+##   server function's environment (server/parts.R, server/README.md). Each
+##   part's header lists what it defines for the others and what it reads.
+##
+##   01_state_sigma.R                   session state and the app-wide sigma_loc
+##   02_data_quality_cve.R              panel: data quality and calibration (CVE)
+##   03_playback_state_zcal.R           playback state, view mode, axial calibration
+##   04_datasets_upload.R               dataset store, upload and the raw data
+##   05_filter_ui.R                     range-filter widgets
+##   06_filter_pipeline.R               THE FILTER PIPELINE
+##   07_cycle_time_sequence.R           cycle time, sequence file, blur
+##   08_rechunk_histogram.R             filter and rechunk on Plot Data; metadata histogram
+##   09_overlay_settings_io.R           image overlay; settings files; filtered CSV
+##   10_triggers.R                      render triggers
+##   11_data_frames.R                   trk(): THE analysis-ready dataset; playback frames
+##   12_track_plot.R                    track plot
+##   13_dt_msd_clusters.R               dt histogram; MSD export and MSD clusters
+##   14_change_point.R                  panel: change-point segmentation
+##   15_msd.R                           panel: MSD
+##   16_tsa_cycles.R                    panel: time-signature analysis (cycle classes)
+##   17_jdd.R                           panel: jump-distance distribution
+##   18_confinement_displacement.R      panels: confinement index; displacement versus diffusion
+##   19_directionality.R                panel: directionality
+##   20_speed_transport.R               panel: speed and transport
+##   21_hmm_state_msd.R                 panels: diffusive-state HMM; per-state MSD
+##   22_dmap.R                          panel: spatial D-map
+##   23_play_loop.R                     play loop, frame slider, axes, spatial crop
+##   24_calibration.R                   panel: calibration from an immobile sample
+##   25_compare_cells.R                 panel: compare cells
+##
+##   The estimators live in R/est_*.R and R/trk_*.R; the parts gather the inputs
+##   and call them. To find a reactive by name: Rscript tools/server_map.R out/
 ##
 ## ── 4. CONVENTIONS & GOTCHAS (things that have bitten us) ────────────────────
 ##   * `tim` is MILLISECONDS in here (seconds on disk, x1000 right after load).
@@ -143,5 +159,3 @@ TRACKING_SERVER_PARTS <- load_server_parts(file.path("server", "tracking"))
 tracking_server <- function(input, output, session) {
   run_server_parts(TRACKING_SERVER_PARTS, environment())
 } # end tracking_server
-
-

@@ -1,3 +1,24 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/tracking/05_filter_ui.R  -  range-filter widgets
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of tracking_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## The metadata, length and histogram range controls and Reset Ranges.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     reset_dur_filter_flag, reset_ranges_trigger, trk_len_reset_flag
+##   READS from other parts:
+##     01_state_sigma: trk_raw_stats_rv, trk_rechunk_bbox,
+##                     trk_rechunk_stats_rv, trk_spatial_filter
+##     04_datasets_upload: trk_has_data, trk_raw_df, trk_view_label
+##     06_filter_pipeline: .FILT_IDS, .filt_value, trk_meta_filtered
+##     07_cycle_time_sequence: tid_summary_rv
+##     10_triggers: data_ver
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ---- Dynamic range UIs ----
 # Bounds come from trk_raw_stats_rv() (frozen at upload, whole dataset) so
 # Sticky bar label: filename + current chunk indicator

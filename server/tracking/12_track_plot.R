@@ -1,3 +1,25 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/tracking/12_track_plot.R  -  track plot
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of tracking_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## output$trk_track2D, the proxy draw functions of the play loop, and the
+## dwell heatmap store.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     draw_frame, draw_tid_point
+##   READS from other parts:
+##     01_state_sigma: rv, slider_guard, trace_map, trk_rechunk_bbox
+##     03_playback_state_zcal: is_seq, loop, trk_z_applied
+##     09_overlay_settings_io: trk_image_overlay
+##     10_triggers: layout_trigger, plot_trigger, trk_axis_x_span,
+##                  trk_data_key, trk_locked_ranges, trk_plot_ready, use_3d
+##     11_data_frames: frames_store, seq_data, trk
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ---- Initial render ----
 output$trk_track2D <- renderPlotly({
   req(!is.na(layout_trigger()))

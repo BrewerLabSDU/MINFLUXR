@@ -1,3 +1,25 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/tracking/01_state_sigma.R  -  session state and the app-wide sigma_loc
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of tracking_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## The reactive values and flags of the tab, the run gates of TSA and speed,
+## and trk_sigma_loc_eff, the noise floor every short-lag estimator subtracts.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     .continuity_scores, .tids_per_chunk, current_tid_idx, is_playing,
+##     rechunk_request, rv, slider_guard, speed_ran, tick, trace_map,
+##     trk_chunk_pref, trk_raw_stats_rv, trk_rechunk_bbox,
+##     trk_rechunk_stats_rv, trk_sigma_loc_cve, trk_sigma_loc_eff,
+##     trk_sigma_loc_photon, trk_sigma_loc_rv, trk_sigma_loc_src,
+##     trk_spatial_filter, trk_zoom_ranges, tsa_ran
+##   READS from other parts:
+##     06_filter_pipeline: bump_clean
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # --- Reactives / state ---
 rv <- reactiveValues(
   prev_tid_idx          = NULL,

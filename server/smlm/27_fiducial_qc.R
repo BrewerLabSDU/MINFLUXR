@@ -1,3 +1,21 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/27_fiducial_qc.R  -  panel: fiducial scan and exclusion
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## The fiducial scan, its plot and table, and qc_exclude_from, which drops
+## flagged traces from both data chains.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     fiducial_results, qc_exclude_from, smlm_nn_unit
+##   READS from other parts:
+##     01_view_upload: smlm_file_store
+##     23_prepared_cache: deblink_on
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ==========================================================================
 # QC 3 - Fiducial / bright-contaminant flagging (report only)
 # ==========================================================================

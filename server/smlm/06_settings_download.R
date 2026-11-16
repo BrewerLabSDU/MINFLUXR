@@ -1,3 +1,19 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/06_settings_download.R  -  download the main and the Median Clustering settings files
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## The two download handlers that write settings JSON.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     (nothing)
+##   READS from other parts:
+##     04_settings_collect_apply: get_ui_settings
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ===========================  END SMLM FILTER PIPELINE  =====================
 
 # --------- 7) SETTINGS LOAD / RESET ----------

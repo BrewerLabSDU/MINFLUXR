@@ -1,3 +1,33 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/33_panel_grid.R  -  figure grid
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## The composable grid that shows several panel figures side by side.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     (nothing)
+##   READS from other parts:
+##     21_density_normalisation: build_density_map_fig,
+##                               build_density_plot_fig,
+##                               build_density_sweep_plot_fig
+##     24_batch_nn: build_nn_batch_hist_fig
+##     25_counts_detection_time: build_det_time_plot_fig,
+##                               build_tid_count_hist_fig,
+##                               build_tid_time_plot_fig
+##     28_crowding_size_nn: build_crowd_plot_fig, build_size_nn_plot_fig
+##     30_radius_gyration: build_rog_hist_fig
+##     31_ripley_pcf: build_pcf_plot_fig, build_ripley_plot_fig
+##     32_hotspots: build_hotspot_density_fig, build_hotspot_ecdf_fig,
+##                  build_hotspot_map_fig, build_hotspot_metric_fig
+##     34_two_colour: build_coloc_curve_fig, build_cross_nn_hist_fig,
+##                    build_kde_coloc_plot_fig, build_pcf12_plot_fig,
+##                    build_ripley12_plot_fig
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 ## ══════════════════════════════════════════════════════════════════════════
 ## MULTI-PANEL VIEW  (3 x 2 slots, one analysis per slot)
 ## ══════════════════════════════════════════════════════════════════════════

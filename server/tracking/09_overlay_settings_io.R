@@ -1,3 +1,27 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/tracking/09_overlay_settings_io.R  -  image overlay; settings files; filtered CSV
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of tracking_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## The confocal overlay with auto-alignment, and saving/loading the filter,
+## playback and overlay settings.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     trk_image_overlay
+##   READS from other parts:
+##     01_state_sigma: trk_raw_stats_rv, trk_rechunk_stats_rv,
+##                     trk_spatial_filter
+##     03_playback_state_zcal: is_simul, trk_z_applied
+##     04_datasets_upload: trk_view_base
+##     05_filter_ui: reset_ranges_trigger
+##     06_filter_pipeline: .FILT_IDS, trk_filt, trk_spatial_filtered
+##     10_triggers: data_ver, fire_frames, fire_layout, layout_trigger
+##     11_data_frames: trk
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ---- Background image overlay (tracking tab) --------------------------------
 # All IDs are trk_-prefixed; logic mirrors the SMLM tab exactly.
 

@@ -1,3 +1,37 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/08_settings_load_reset.R  -  load and reset settings; filtered CSV export
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## The two-colour settings download, the filtered-data CSV, the main Load
+## settings observer with its restore plan, the side-file loaders, and the
+## reset buttons.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     (nothing)
+##   READS from other parts:
+##     01_view_upload: smlm_2d_crop_rv, trim_applied_rv, uploaded_df_rv,
+##                     z_scale_applied
+##     02_multiplex: .mplex_off_of, .mplex_store_off, MPLEX_SETTINGS_TYPE
+##     03_dataset_zcal: commit_z_scale, uploaded_df
+##     04_settings_collect_apply: apply_cluster2_settings, apply_filters,
+##                                apply_heatmap, apply_overlay,
+##                                apply_overlay_settings,
+##                                apply_two_color_settings,
+##                                cluster2_defaults,
+##                                filters_defaults_from_data,
+##                                heatmap_defaults, overlay_defaults,
+##                                two_color_defaults
+##     05_filter_pipeline: metadata_filtered_df, sd_skip_arming
+##     09_trace_spread: sd_grey_tbl
+##     10_triggers_stores: plot_trigger
+##     11_dcr_split: dcr_note_written
+##     17_plottable_data: plottable_data
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 output$download_two_color_settings <- downloadHandler(
   filename = function() {
     base <- if (!is.null(input$active_file) && nzchar(input$active_file)) tools::file_path_sans_ext(input$active_file) else "smlm"

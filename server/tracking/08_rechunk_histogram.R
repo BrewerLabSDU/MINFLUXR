@@ -1,3 +1,26 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/tracking/08_rechunk_histogram.R  -  filter and rechunk on Plot Data; metadata histogram
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of tracking_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## The observer that runs the whole filter pipeline on the original upload and
+## rewrites the playback chunks, and the metadata histogram.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     (nothing)
+##   READS from other parts:
+##     01_state_sigma: .tids_per_chunk, rechunk_request, trk_chunk_pref,
+##                     trk_raw_stats_rv, trk_rechunk_bbox,
+##                     trk_rechunk_stats_rv, trk_spatial_filter
+##     05_filter_ui: reset_dur_filter_flag, trk_len_reset_flag
+##     06_filter_pipeline: trk_dur_filtered_d, trk_filter_params
+##     07_cycle_time_sequence: trk_cluster_cycle, trk_cycle_time
+##     10_triggers: trk_data_key
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ---- Filter + rechunk (driven by Plot Data) ---------------------------------
 # Always reads from original_manifest_dir (frozen at upload) so repeated
 # rechunks are idempotent - Reset Ranges + Rechunk restores the full dataset.

@@ -1,3 +1,25 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/21_density_normalisation.R  -  labelling-density profile and thinning
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Measuring each file's density, choosing the common target, the
+## keep-probabilities, and thinning one file's units. The thinning changes the
+## data of every batch panel.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     apply_density_thinning, build_density_map_fig, build_density_plot_fig,
+##     build_density_sweep_plot_fig, density_p_map
+##   READS from other parts:
+##     01_view_upload: smlm_file_store
+##     20_dataset_groups: apply_dataset_groups, file_group_map,
+##                        series_palette
+##     27_fiducial_qc: qc_exclude_from
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 ## ══════════════════════════════════════════════════════════════════════════
 ## LABELLING-DENSITY NORMALISATION  (opt-in, default OFF)
 ## ══════════════════════════════════════════════════════════════════════════

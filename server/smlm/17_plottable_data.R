@@ -1,3 +1,25 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/17_plottable_data.R  -  plottable_data: THE analysis-ready data of the active file
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Crops, rogue removal, grouping and clustering (apply_clustering_pipeline),
+## then colours and hover text. Recomputes on plot_trigger only.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     plottable_data
+##   READS from other parts:
+##     01_view_upload: smlm_2d_crop_rv, uploaded_df_rv, z_scale_applied
+##     02_multiplex: .mplex_clu_memo, .mplex_off_of, .mplex_residual_shift,
+##                   .mplex_store_off
+##     05_filter_pipeline: filtered_df
+##     10_triggers_stores: fit_log_rv, plot_trigger
+##     16_crop_range_ui: apply_trimmer
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # make_two_color_tid_map() was a third copy of the DCR/fluo trace split, kept
 # alongside assign_two_color_group() and assign_analysis_group(). All three are
 # now resolve_channels() in R/smlm_channels.R, which is the only place a channel

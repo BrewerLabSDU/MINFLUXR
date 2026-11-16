@@ -1,3 +1,21 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/sim/01_view_scalebars.R  -  view state and scale bars
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of sim_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Zoom state and the scale bars of the two simulator plots.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     sim_axis_x_span, sim_diff_full, sim_diff_ready, sim_diff_x_span,
+##     sim_full_x_span, sim_plot_ready, sim_push_diff_scale_bar,
+##     sim_push_scale_bar, sim_use_fov
+##   READS from other parts:
+##     02_smlm_simulation: sim_result
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ── Zoom-aware scale bar (mirrors the SMLM tab) ──────────────────────────────
 # The bar lives in paper coordinates with width = length_nm / visible_x_span,
 # so it must be re-pushed whenever the user zooms (the visible span changes).

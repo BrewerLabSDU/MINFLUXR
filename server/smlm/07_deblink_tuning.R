@@ -1,3 +1,23 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/07_deblink_tuning.R  -  tuning aids for de-blinking and Median Clustering
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## kNN distance plot for the Median Clustering eps, the centroid-merge
+## threshold suggestion, per-channel trace spread, and the exploratory
+## molecule-count-versus-radius curve.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     (nothing)
+##   READS from other parts:
+##     05_filter_pipeline: filtered_df
+##     11_dcr_split: dcr_conf_tbl
+##     17_plottable_data: plottable_data
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ── kNN-distance diagnostic for tuning cluster2 eps ──
 # Plots, for the same centroid set cluster2 operates on (trace medians, or
 # de-blinked molecule medians when de-blinking is on), the sorted distance

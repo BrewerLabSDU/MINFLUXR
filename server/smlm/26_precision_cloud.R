@@ -1,3 +1,20 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/26_precision_cloud.R  -  panel: precision cloud and sample stability
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Run handler, the cloud and drift plots, statistics and download.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     (nothing)
+##   READS from other parts:
+##     01_view_upload: smlm_file_store
+##     27_fiducial_qc: qc_exclude_from
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ==========================================================================
 # QC 1 - Localization precision cloud (within-trace scatter about the centroid)
 # ==========================================================================

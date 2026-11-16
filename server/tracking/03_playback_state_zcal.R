@@ -1,3 +1,23 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/tracking/03_playback_state_zcal.R  -  playback state, view mode, axial calibration
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of tracking_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## The play-loop state environment, chunk and view selectors, and the
+## pending/applied axial (z) factor.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     is_seq, is_simul, loop, n_frames_eff, trk_z_applied
+##   READS from other parts:
+##     01_state_sigma: rv, trk_chunk_pref
+##     04_datasets_upload: trk_has_data, trk_raw_loaded
+##     10_triggers: fire_layout
+##     11_data_frames: trk
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # Non-reactive loop state for sequential mode (safe for later())
 is_seq   <- reactive(identical(input$trk_play_mode, "seq"))
 is_simul <- reactive(identical(input$trk_play_mode, "simul"))

@@ -1,3 +1,27 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/01_view_upload.R  -  view state, 3D rotate/record, file upload
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Zoom and crop state of the main plot, the scale bar, 3D auto-rotate and
+## recording, and the upload path: reading each file into the file store,
+## switching the active file, removing a file.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     smlm_2d_crop_rv, smlm_axis_x_span, smlm_default_x_span, smlm_file_store,
+##     smlm_push_scale_bar, smlm_zoom_ranges, trim_applied_rv, uploaded_df_rv,
+##     z_scale_applied
+##   READS from other parts:
+##     02_multiplex: .mplex_sync_active
+##     03_dataset_zcal: commit_z_scale
+##     05_filter_pipeline: sd_filt, sd_skip_arming
+##     13_image_overlay: image_overlay
+##     17_plottable_data: plottable_data
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 smlm_axis_x_span  <- reactiveVal(NULL)
 smlm_zoom_ranges  <- reactiveVal(NULL)   # list(x=c(x0,x1), y=c(y0,y1)) from 2D plot zoom
 smlm_2d_crop_rv   <- reactiveVal(NULL)   # active 2D crop box: list(x=c(x0,x1), y=c(y0,y1))

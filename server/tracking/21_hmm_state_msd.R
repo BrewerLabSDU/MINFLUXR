@@ -1,3 +1,26 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/tracking/21_hmm_state_msd.R  -  panels: diffusive-state HMM; per-state MSD
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of tracking_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## hmm_bundle (R/est_hmm.R) with its readouts, and the MSD of each decoded
+## state.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     (nothing)
+##   READS from other parts:
+##     01_state_sigma: trk_sigma_loc_eff, trk_sigma_loc_src
+##     02_data_quality_cve: trk_cve_bundle
+##     06_filter_pipeline: .a_in_use
+##     07_cycle_time_sequence: trk_blur, trk_cluster_cycle, trk_cycle_time
+##     11_data_frames: trk
+##     15_msd: .msd_d_eff
+##     17_jdd: jdd_bundle
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ============================================================================
 # hmm_bundle() - DIFFUSION-STATE SEGMENTATION (continuous-time HMM, est_hmm.R)
 # ============================================================================

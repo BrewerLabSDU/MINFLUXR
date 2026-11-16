@@ -1,3 +1,22 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/sim/02_smlm_simulation.R  -  SMLM simulation
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of sim_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## sim_result: ground truth, labelling, blinking and localizations for the
+## chosen structure and acquisition settings (generators in R/sim_*.R), and
+## the live acquisition timeline.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     sim_acq_live, sim_result
+##   READS from other parts:
+##     01_view_scalebars: sim_use_fov
+##     05_smlm_outputs: crlb_inputs
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║  PHASE 1 - Synthetic localizations                                      ║
 # ╚══════════════════════════════════════════════════════════════════════════╝

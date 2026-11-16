@@ -1,3 +1,30 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/tracking/07_cycle_time_sequence.R  -  cycle time, sequence file, blur
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of tracking_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## The resolved acquisition cycle time and its sources, the hints of the
+## cleaning controls, the sequence JSON, and trk_blur (the motion-blur
+## coefficients every estimator uses).
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     tid_summary_rv, trk_adaptive_gap_cycles, trk_blur, trk_cluster_cycle,
+##     trk_cycle_time, trk_hw_cycle_time, trk_regression_cycle, trk_seq_params
+##   READS from other parts:
+##     01_state_sigma: rv, trk_raw_stats_rv, trk_rechunk_stats_rv, tsa_ran
+##     04_datasets_upload: trk_has_data, trk_raw_df, trk_raw_original
+##     05_filter_ui: reset_dur_filter_flag, reset_ranges_trigger
+##     06_filter_pipeline: .filt_value, trk_end_trimmed_d, trk_gap_split,
+##                         trk_gap_split_d, trk_len_filtered,
+##                         trk_quality_filtered_d, trk_spatial_filtered
+##     10_triggers: data_ver
+##     11_data_frames: trk
+##     16_tsa_cycles: cycle_class_bundle
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ===========================  END FILTER PIPELINE  =========================
 
 # ===========================================================================

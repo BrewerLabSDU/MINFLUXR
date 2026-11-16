@@ -1,3 +1,23 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/03_dataset_zcal.R  -  active dataset, axial calibration, filter reset on new data
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## uploaded_df (the active dataset), committing the axial (z) calibration
+## factor, and resetting the filters when a new dataset becomes active.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     commit_z_scale, smlm_z_state, uploaded_df
+##   READS from other parts:
+##     01_view_upload: smlm_file_store, uploaded_df_rv, z_scale_applied
+##     02_multiplex: .mplex_show_offset, mplex_offsets_rv
+##     04_settings_collect_apply: apply_filters, filters_defaults_from_data
+##     05_filter_pipeline: sd_skip_arming, tid_reset_flag
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 uploaded_df <- reactive({
   df <- uploaded_df_rv()
   shiny::validate(shiny::need(!is.null(df) && nrow(df) > 0, "No data loaded yet."))

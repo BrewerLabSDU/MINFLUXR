@@ -1,3 +1,26 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/31_ripley_pcf.R  -  panels: Ripley L and pair correlation g(r)
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Run handlers with the CSR envelope, the correlation length, figures,
+## summary and downloads.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     build_pcf_plot_fig, build_ripley_plot_fig, pcf_params, ripley_params
+##   READS from other parts:
+##     01_view_upload: smlm_file_store
+##     17_plottable_data: plottable_data
+##     20_dataset_groups: file_group_map, file_palette, series_palette
+##     22_spatial_window: spatial_gate_close, spatial_report_windows,
+##                        spatial_support_of
+##     23_prepared_cache: prepared_df, resolve_unit
+##     32_hotspots: spatial_outline_pts
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 ## ── Ripley's L(r) ─────────────────────────────────────────────────────────
 ## ── Global (whole-curve) CSR test: band + caption ──────────────────────────
 

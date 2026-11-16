@@ -1,3 +1,25 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/tracking/04_datasets_upload.R  -  dataset store, upload and the raw data
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of tracking_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## The store of uploaded files, ingesting and activating a dataset (chunking),
+## and trk_raw_df / trk_raw_original.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     trk_has_data, trk_raw_df, trk_raw_loaded, trk_raw_original, trk_store,
+##     trk_view_base, trk_view_label
+##   READS from other parts:
+##     01_state_sigma: .tids_per_chunk, rv, trk_chunk_pref, trk_raw_stats_rv,
+##                     trk_rechunk_bbox, trk_rechunk_stats_rv,
+##                     trk_spatial_filter
+##     03_playback_state_zcal: trk_z_applied
+##     10_triggers: trk_data_key
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ============================================================================
 # DATASETS - uploads add files to a store; one VIEW of it is active
 # ============================================================================

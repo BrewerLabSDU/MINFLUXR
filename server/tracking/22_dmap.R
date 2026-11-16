@@ -1,3 +1,21 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/tracking/22_dmap.R  -  panel: spatial D-map
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of tracking_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## dmap_bundle (R/est_dmap.R), map, summary and download.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     (nothing)
+##   READS from other parts:
+##     01_state_sigma: trk_sigma_loc_eff
+##     07_cycle_time_sequence: trk_blur, trk_cycle_time
+##     11_data_frames: trk
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ==========================================================================
 # dmap_bundle() - SPATIALLY RESOLVED DIFFUSION MAP
 # ==========================================================================

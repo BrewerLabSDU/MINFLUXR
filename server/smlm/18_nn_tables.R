@@ -1,3 +1,24 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/18_nn_tables.R  -  nearest-neighbour tables and their downloads
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## nn_table, the NN lines between Median Clusters, and the table downloads of
+## the main plot.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     secondary_nn_lines
+##   READS from other parts:
+##     03_dataset_zcal: uploaded_df
+##     10_triggers_stores: cluster2_table_store, plot_trigger
+##     12_metadata_histogram: nn_table_cluster2
+##     16_crop_range_ui: data
+##     17_plottable_data: plottable_data
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 output$hist_range_ui <- renderUI({
   req(input$file, input$hist_variable)
   

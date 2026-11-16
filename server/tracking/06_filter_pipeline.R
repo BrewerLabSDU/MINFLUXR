@@ -1,3 +1,28 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/tracking/06_filter_pipeline.R  -  THE FILTER PIPELINE
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of tracking_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## The stored filter settings (trk_filt) and the stages raw -> split ->
+## end-trim -> continuity gate -> metadata -> length -> duration -> spatial
+## crop.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     .a_in_use, .FILT_IDS, .filt_value, bump_clean, trk_dur_filtered_d,
+##     trk_end_trimmed_d, trk_filt, trk_filter_params, trk_gap_split,
+##     trk_gap_split_d, trk_len_filtered, trk_len_filtered_d,
+##     trk_meta_filtered, trk_meta_filtered_d, trk_quality_filtered_d,
+##     trk_spatial_filtered
+##   READS from other parts:
+##     01_state_sigma: trk_spatial_filter
+##     04_datasets_upload: trk_raw_df
+##     07_cycle_time_sequence: trk_adaptive_gap_cycles, trk_cycle_time,
+##                             trk_seq_params
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ---- Three-stage filtering pipeline ----------------------------------------
 # Pipeline: Stage 1 (metadata) → Stage 2 (trace ID length) → Stage 3 (duration).
 # Each stage uses metrics computed from the PREVIOUS stage's output so that

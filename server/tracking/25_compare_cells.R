@@ -1,3 +1,24 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/tracking/25_compare_cells.R  -  panel: compare cells
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of tracking_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## One file = one cell: the per-file settings table, the run
+## (R/est_percell.R), and the comparison plot and statistics.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     .cmp_read_file
+##   READS from other parts:
+##     03_playback_state_zcal: trk_z_applied
+##     04_datasets_upload: trk_store
+##     06_filter_pipeline: trk_filter_params
+##     15_msd: .msd_settings
+##     24_calibration: trk_cal_profiles
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ============================================================================
 # COMPARE CELLS - one value per file (= one cell), conditions compared across cells
 # ============================================================================

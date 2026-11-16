@@ -1,3 +1,20 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/22_spatial_window.R  -  observation window of the spatial statistics
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## The support window of one file (closing radius, bounding-box cap), the
+## common closing radius of a comparison set, and the window readout.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     spatial_gate_close, spatial_report_windows, spatial_support_of
+##   READS from other parts:
+##     (nothing)
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 ## ── Support-aware observation window for the spatial statistics ────────────
 ## One switch, because it is one methodological choice: whether Ripley's L, g(r),
 ## L12, g12 and the co-localization null measure intensity over the SAMPLE SUPPORT

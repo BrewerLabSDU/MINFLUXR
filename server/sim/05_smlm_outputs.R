@@ -1,3 +1,26 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/sim/05_smlm_outputs.R  -  SMLM simulator outputs
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of sim_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## The plot, summaries, precision budget, comparison views, confocal view,
+## acquisition plots and CSV exports.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     crlb_inputs
+##   READS from other parts:
+##     01_view_scalebars: sim_axis_x_span, sim_diff_full, sim_diff_ready,
+##                        sim_diff_x_span, sim_full_x_span, sim_plot_ready,
+##                        sim_push_diff_scale_bar, sim_push_scale_bar,
+##                        sim_use_fov
+##     02_smlm_simulation: sim_acq_live, sim_result
+##     03_real_run_calibration: sim_real_rv
+##     04_compare_strategies: compare_result
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ── Phase 1 plot ─────────────────────────────────────────────────────────────
 output$sim_plot <- renderPlotly({
   res <- sim_result()

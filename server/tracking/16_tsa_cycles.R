@@ -1,3 +1,26 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/tracking/16_tsa_cycles.R  -  panel: time-signature analysis (cycle classes)
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of tracking_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Integrated versus dark steps, before/after cleaning, cycle progression, and
+## the MSD downloads.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     cycle_class_bundle
+##   READS from other parts:
+##     01_state_sigma: tsa_ran
+##     04_datasets_upload: trk_raw_original
+##     06_filter_pipeline: trk_spatial_filtered
+##     07_cycle_time_sequence: trk_cluster_cycle, trk_cycle_time,
+##                             trk_hw_cycle_time
+##     11_data_frames: trk
+##     13_dt_msd_clusters: dt_vectors, msd_export
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ==========================================================================
 # cycle_class_bundle() - INTEGRATED vs DARK CYCLE CLASSIFICATION (TSA core)
 # ==========================================================================

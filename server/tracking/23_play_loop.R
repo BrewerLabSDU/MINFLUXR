@@ -1,3 +1,29 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/tracking/23_play_loop.R  -  play loop, frame slider, axes, spatial crop
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of tracking_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Play / pause / stop, auto-tune, the frame slider, axis and scale-bar
+## updates, and crop to view.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     (nothing)
+##   READS from other parts:
+##     01_state_sigma: current_tid_idx, is_playing, slider_guard, tick,
+##                     trace_map, trk_spatial_filter, trk_zoom_ranges
+##     03_playback_state_zcal: is_seq, is_simul, loop, n_frames_eff
+##     09_overlay_settings_io: trk_image_overlay
+##     10_triggers: data_ver, fire_frames, fire_layout, layout_trigger,
+##                  plot_trigger, trk_axis_x_span, trk_data_key,
+##                  trk_default_axis_state, trk_locked_ranges,
+##                  trk_plot_ready, use_3d
+##     11_data_frames: frames_store, seq_data, trk
+##     12_track_plot: draw_frame, draw_tid_point
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ---- Playback engine ----
 # --- Play / Pause ---
 observeEvent(input$trk_btn_play, {

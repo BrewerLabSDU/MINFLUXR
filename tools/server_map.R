@@ -15,6 +15,7 @@
 ## USE
 ##   Rscript tools/server_map.R                 # maps the three server closures
 ##   Rscript tools/server_map.R out_dir         # writes <out_dir>/<name>_map.csv
+##   Rscript tools/server_map.R --headers       # refresh the DEFINES/READS block of every part
 ##   From R:  source("tools/server_map.R"); m <- server_statement_map("smlm")
 ##   Run from the repo root.
 ##
@@ -136,7 +137,7 @@ map_server_closure <- function(file, fn_name = NULL, known = character(0)) {
     refs  <- attr(body, "srcref")[-1]
   }
   cls   <- lapply(stmts, .classify)
-  names_defined <- unique(c(known, vapply(cls, function(k) if (k$kind != "output") k$name else "", "")))
+  names_defined <- unique(c(known, vapply(cls, function(k) if (k$kind %in% c("output", "call")) "" else k$name, "")))
   names_defined <- names_defined[nzchar(names_defined) & grepl("^[.A-Za-z][.A-Za-z0-9_]*$", names_defined)]
 
   # Section banners: comment lines that carry a heading mark.
@@ -204,8 +205,103 @@ server_statement_map <- function(tab) {
   out
 }
 
+## ── Part interfaces ──────────────────────────────────────────────────────────
+## Once a closure is split into part files, each part's header states what it
+## DEFINES for other parts and what it READS from them. The functions below
+## compute those lists from the code, write them into the headers, and let a
+## test confirm the headers are current.
+
+# GOAL: the closure-level names one statement reads. Scope-aware (codetools): a
+# local variable that happens to share a closure object's name is not a read.
+# The statement is wrapped as the body of a function so its own assignment
+# target counts as local.
+.stmt_reads <- function(e, names) {
+  g <- tryCatch({
+    f <- eval(call("function", NULL, e), baseenv())
+    codetools::findGlobals(f, merge = TRUE)
+  }, error = function(err) all.names(e, unique = TRUE))
+  intersect(g, names)
+}
+
+# GOAL: for every part file of a tab, the names it defines that another part
+# reads, and the names it reads from other parts (with the part they come from).
+# RETURNS a named list per part file: list(defines = chr, reads = named list
+#   source part -> chr, n_lines, n_statements).
+server_part_interfaces <- function(tab) {
+  s <- SERVER_CLOSURES[[tab]]
+  parts <- sort(list.files(s$parts, "^[0-9]{2}_.*[.]R$", full.names = TRUE))
+  parsed <- lapply(parts, parse, keep.source = FALSE, encoding = "UTF-8")
+  defs <- lapply(parsed, function(p) {
+    nm <- vapply(as.list(p), function(e) { k <- .classify(e); if (k$kind %in% c("output", "call")) "" else k$name }, "")
+    unique(nm[grepl("^[.A-Za-z][.A-Za-z0-9_]*$", nm)])
+  })
+  owner <- stats::setNames(rep(basename(parts), lengths(defs)), unlist(defs))
+  all_names <- names(owner)
+  reads <- lapply(parsed, function(p) unique(unlist(lapply(as.list(p), .stmt_reads, names = all_names))))
+  out <- lapply(seq_along(parts), function(i) {
+    me <- basename(parts[i])
+    ext <- sort(setdiff(reads[[i]], defs[[i]]))
+    used_elsewhere <- unique(unlist(reads[-i]))
+    list(defines = sort(intersect(defs[[i]], used_elsewhere)),
+         reads = split(ext, owner[ext]),
+         n_lines = length(readLines(parts[i], warn = FALSE)), n_statements = length(parsed[[i]]))
+  })
+  stats::setNames(out, basename(parts))
+}
+
+.PART_IFACE_OPEN  <- "## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)"
+.PART_IFACE_CLOSE <- "## END INTERFACE"
+
+# GOAL: the generated interface block of one part, as comment lines.
+.part_interface_lines <- function(iface) {
+  wrap <- function(prefix, x) {
+    if (!length(x)) return(paste0(prefix, "(nothing)"))
+    w <- strwrap(paste(x, collapse = ", "), width = 78 - nchar(prefix))
+    paste0(c(prefix, rep(paste0("##", strrep(" ", nchar(prefix) - 2L)), length(w) - 1L)), w)
+  }
+  rd <- if (length(iface$reads)) unlist(lapply(names(iface$reads), function(src)
+          wrap(sprintf("##     %s: ", sub("[.]R$", "", src)), iface$reads[[src]]))) else "##     (nothing)"
+  c(.PART_IFACE_OPEN,
+    "##   DEFINES for other parts:", sub("^##   ", "##     ", wrap("##   ", iface$defines)),
+    "##   READS from other parts:", rd,
+    .PART_IFACE_CLOSE)
+}
+
+# GOAL: write (or refresh) the interface block in every part header of a tab.
+# A part with no block yet gets a full header built from `titles` (file name ->
+# c(title, purpose)); an existing header keeps its hand-written lines.
+write_part_headers <- function(tab, titles = list()) {
+  s <- SERVER_CLOSURES[[tab]]
+  ifs <- server_part_interfaces(tab)
+  rule <- paste0("## ", strrep("─", 77))
+  for (f in names(ifs)) {
+    path <- file.path(s$parts, f)
+    x <- readLines(path, warn = FALSE, encoding = "UTF-8")
+    blk <- .part_interface_lines(ifs[[f]])
+    a <- match(.PART_IFACE_OPEN, x); b <- match(.PART_IFACE_CLOSE, x)
+    if (!is.na(a) && !is.na(b)) {
+      x <- c(x[seq_len(a - 1L)], blk, x[-seq_len(b)])
+    } else {
+      t <- titles[[f]] %||% c(sub("[.]R$", "", f), "")
+      x <- c(rule, sprintf("## %s/%s  -  %s", gsub("\\\\", "/", s$parts), f, t[1]), rule,
+             sprintf("## Part of %s(). Not a standalone script: its statements are evaluated in", s$fn),
+             "## the server function's environment, in file-name order (server/parts.R).",
+             "##", paste0("## ", strwrap(t[2], 76)), "##", blk, rule, "", x)
+    }
+    con <- file(path, open = "wb"); writeLines(enc2utf8(x), con, sep = "\n", useBytes = TRUE); close(con)
+  }
+  invisible(ifs)
+}
+
+`%||%` <- function(a, b) if (is.null(a)) b else a
+
 if (sys.nframe() == 0L) {
   args    <- commandArgs(trailingOnly = TRUE)
+  if ("--headers" %in% args) {                 # refresh the interface block of every part
+    for (tab in names(SERVER_CLOSURES)) if (dir.exists(SERVER_CLOSURES[[tab]]$parts)) write_part_headers(tab)
+    cat("part headers refreshed
+"); quit(save = "no")
+  }
   out_dir <- if (length(args)) args[1] else NULL
   for (tab in names(SERVER_CLOSURES)) {
     s <- SERVER_CLOSURES[[tab]]

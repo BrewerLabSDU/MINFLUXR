@@ -1,3 +1,26 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/23_prepared_cache.R  -  prepared_df: THE analysis-ready data of any file (batch chain)
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## The cached filter, thinning and clustering chain every batch panel reads,
+## its cache key, the stale-results badges, and resolving a panel's unit
+## against the de-blinking switch.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     .small_n_note, .stale_badge, cluster2_label, cluster2_on, deblink_label,
+##     deblink_on, prepared_df, resolve_unit
+##   READS from other parts:
+##     01_view_upload: smlm_file_store, z_scale_applied
+##     21_density_normalisation: apply_density_thinning, density_p_map
+##     24_batch_nn: nn_batch_params_live
+##     27_fiducial_qc: fiducial_results, qc_exclude_from
+##     31_ripley_pcf: pcf_params, ripley_params
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 ## ── Small-N reliability advisory for the per-structure geometry panels ──────
 ## Every shape metric is estimated from a cluster's own members and is biased at
 ## low member counts, in DIFFERENT directions, so a bare member count does not tell

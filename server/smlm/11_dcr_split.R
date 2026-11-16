@@ -1,3 +1,20 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/11_dcr_split.R  -  two-colour split by DCR
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Automatic DCR threshold from a two-component mixture, the pooled-DCR
+## option, and the per-trace assignment confidence.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     dcr_conf_tbl, dcr_note_written, hist_channels_df
+##   READS from other parts:
+##     05_filter_pipeline: filtered_df
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ------ 2-color: auto-detect DCR split via GMM
 dcr_gmm_result <- reactiveVal(NULL)
 

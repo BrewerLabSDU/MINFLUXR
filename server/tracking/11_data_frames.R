@@ -1,3 +1,25 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/tracking/11_data_frames.R  -  trk(): THE analysis-ready dataset; playback frames
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of tracking_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## trk() (what every analysis reads), the chunk scope of playback, seq_data
+## and frames_store.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     frames_store, seq_data, trk
+##   READS from other parts:
+##     01_state_sigma: tick
+##     03_playback_state_zcal: is_simul
+##     06_filter_pipeline: trk_gap_split, trk_spatial_filtered
+##     07_cycle_time_sequence: trk_cycle_time
+##     10_triggers: cluster_color_map_stored, conf_color_map_stored,
+##                  data_ver, layout_trigger, plot_trigger, use_3d
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # Filter changes do NOT live-update the track plot (the old filter_tick auto-replot
 # was removed). The metadata / length / duration filters - like the split / trim /
 # quality-gate cleaning stages - apply to the plotted data ONLY when the user presses

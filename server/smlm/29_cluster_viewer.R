@@ -1,3 +1,21 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/29_cluster_viewer.R  -  panel: cluster viewer and shape fit (exploratory)
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Snapshot of the clusters to browse, the current cluster, the shape fits
+## with model selection, and the viewer plot.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     (nothing)
+##   READS from other parts:
+##     01_view_upload: smlm_file_store
+##     23_prepared_cache: cluster2_label, deblink_on, prepared_df
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 ## ── Cluster Viewer (2D / 3D + shape fit) ──────────────────────────────────
 # Inspect one Median Cluster structure at a time. A Run button snapshots the
 # clusters; Prev/Next and view options then work on that snapshot, so it does

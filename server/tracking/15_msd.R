@@ -1,3 +1,26 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/tracking/15_msd.R  -  panel: MSD
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of tracking_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## D_max, the unified cycle-binned MSD (msd_unified_bundle), its fits,
+## per-track D, the binning diagnostic, publishing the MSD sigma, bootstrap
+## and estimates.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     .geom_for_null, .msd_d_eff, .msd_settings, msd_unified_bundle,
+##     msd_unified_fit, msd_unified_modelfit, trk_unified_tdiff
+##   READS from other parts:
+##     01_state_sigma: trk_sigma_loc_eff, trk_sigma_loc_rv, trk_sigma_loc_src
+##     07_cycle_time_sequence: trk_blur, trk_cluster_cycle, trk_cycle_time,
+##                             trk_hw_cycle_time
+##     11_data_frames: trk
+##     13_dt_msd_clusters: msd_cluster_rv, msd_pertk_fits
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # --- Diffusion limit (D_max) panel -----------------------------------------
 output$trk_dmax_panel <- renderUI({
   req(isTRUE(input$trk_show_dmax))

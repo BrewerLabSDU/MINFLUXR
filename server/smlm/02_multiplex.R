@@ -1,3 +1,27 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/02_multiplex.R  -  multiplexed MINFLUX: build, align, save
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Building a multiplex dataset from several files or from time windows, the
+## channel alignment nudge pad, the multiplex settings file, and the channel
+## split used by the spatial statistics.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     .mplex_clu_memo, .mplex_off_of, .mplex_residual_shift,
+##     .mplex_show_offset, .mplex_store_off, .mplex_sync_active,
+##     mplex_cross_pair, mplex_offsets_rv, MPLEX_SETTINGS_TYPE,
+##     mplex_split_active
+##   READS from other parts:
+##     01_view_upload: smlm_file_store, uploaded_df_rv, z_scale_applied
+##     03_dataset_zcal: smlm_z_state
+##     05_filter_pipeline: filtered_df
+##     10_triggers_stores: plot_trigger
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ── MULTIPLEXED MINFLUX ─────────────────────────────────────────────────────
 # Build an N-channel combined dataset (overlay loaded files, or split the active
 # file by TIM breakpoints) carrying mplex_channel / mplex_label / mplex_color.

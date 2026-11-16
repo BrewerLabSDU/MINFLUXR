@@ -1,3 +1,26 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/25_counts_detection_time.R  -  panels: traces per cluster, detection over time
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Traces per cluster, Median Cluster detection over time and trace detection
+## over time.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     build_det_time_plot_fig, build_tid_count_hist_fig,
+##     build_tid_time_plot_fig, tid_count_results
+##   READS from other parts:
+##     01_view_upload: smlm_file_store
+##     20_dataset_groups: apply_dataset_groups, series_palette
+##     21_density_normalisation: apply_density_thinning
+##     23_prepared_cache: cluster2_label, cluster2_on, deblink_label,
+##                        prepared_df
+##     27_fiducial_qc: qc_exclude_from
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ------ Traces per Cluster -------------------------------------------------
 tid_count_results <- reactiveVal(NULL)
 tid_count_params  <- reactiveVal(NULL)   # compute params, frozen at Run

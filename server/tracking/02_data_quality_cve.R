@@ -1,3 +1,31 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/tracking/02_data_quality_cve.R  -  panel: data quality and calibration (CVE)
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of tracking_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## trk_cve_bundle (CVE sigma and D, per-track sigma, linking QC, photon-budget
+## sigma, headline D), publishing sigma, and the panel's readouts.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     trk_cve_bundle
+##   READS from other parts:
+##     01_state_sigma: .continuity_scores, trk_raw_stats_rv,
+##                     trk_sigma_loc_cve, trk_sigma_loc_photon
+##     04_datasets_upload: trk_raw_original
+##     06_filter_pipeline: .a_in_use, trk_dur_filtered_d, trk_end_trimmed_d,
+##                         trk_gap_split_d, trk_len_filtered_d,
+##                         trk_meta_filtered_d, trk_quality_filtered_d,
+##                         trk_spatial_filtered
+##     07_cycle_time_sequence: trk_blur, trk_cluster_cycle, trk_cycle_time,
+##                             trk_seq_params
+##     11_data_frames: trk
+##     15_msd: .msd_settings
+##     24_calibration: trk_cal_profiles
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ============================================================================
 # trk_cve_bundle() - LOCALIZATION PRECISION (σ_loc) + DATA-QUALITY CALIBRATION
 # ============================================================================

@@ -1,3 +1,23 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/05_filter_pipeline.R  -  THE FILTER PIPELINE of the active file
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Stage 1 metadata ranges, stage 1b outlier localizations, stage 2 trace
+## spread, stage 3 trace length. Output: filtered_df, which plottable_data
+## turns into the analysis data.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     filtered_df, metadata_filtered_df, sd_filt, sd_skip_arming,
+##     tid_reset_flag
+##   READS from other parts:
+##     03_dataset_zcal: uploaded_df
+##     27_fiducial_qc: qc_exclude_from
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # --------- 5) RANGE UI ( ----------
 # Store committed default ranges for metadata + spread filters (used to avoid "filtering on load").
 # Updated in two steps per upload: (1) frozen to current inputs at the top of the upload observer

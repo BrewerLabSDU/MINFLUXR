@@ -1,3 +1,26 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/tracking/10_triggers.R  -  render triggers
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of tracking_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## layout_trigger, plot_trigger and data_ver, fire_layout / fire_frames, and
+## the Plot Data button.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     cluster_color_map_stored, conf_color_map_stored, data_ver, fire_frames,
+##     fire_layout, has_z, layout_trigger, plot_trigger, trk_axis_x_span,
+##     trk_data_key, trk_default_axis_state, trk_locked_ranges, trk_plot_ready,
+##     use_3d
+##   READS from other parts:
+##     01_state_sigma: is_playing, rechunk_request, rv
+##     03_playback_state_zcal: loop
+##     06_filter_pipeline: bump_clean
+##     11_data_frames: frames_store, trk
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ---- Two-level trigger system -----------------------------------------------
 # layout_trigger: fires only when the Plotly CHART STRUCTURE changes (number of
 #   traces, colors, static lines, heatmap layer, play mode).  renderPlotly

@@ -1,3 +1,24 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/16_crop_range_ui.R  -  3D crop controls and the metadata range sliders
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## The box/sphere crop (preview, apply, clear), the seven metadata range
+## sliders, and the cross-channel NN table of the active file.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     add_3d_crop_preview, apply_trimmer, data
+##   READS from other parts:
+##     01_view_upload: trim_applied_rv
+##     03_dataset_zcal: uploaded_df
+##     05_filter_pipeline: filtered_df
+##     10_triggers_stores: plot_trigger
+##     17_plottable_data: plottable_data
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 #--- 3D-Only server parts:
 
 

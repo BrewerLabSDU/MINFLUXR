@@ -1,3 +1,25 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/28_crowding_size_nn.R  -  panels: crowding versus detection time, NN versus cluster size
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Run handlers, null test, figures and downloads of the two Median Cluster
+## panels.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     build_crowd_plot_fig, build_size_nn_plot_fig, crowd_results,
+##     size_nn_results
+##   READS from other parts:
+##     01_view_upload: smlm_file_store
+##     20_dataset_groups: apply_dataset_groups, series_palette
+##     23_prepared_cache: .small_n_note, cluster2_label, cluster2_on,
+##                        prepared_df
+##     27_fiducial_qc: qc_exclude_from, smlm_nn_unit
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 ## ── Median Cluster (cluster2) Crowding vs Detection-Time Shift ─────────────────────────────
 # One row per Cluster2 structure (built from its member centroids - de-blinked
 # molecules when de-blinking is on, else trace IDs):

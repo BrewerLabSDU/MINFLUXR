@@ -1,3 +1,24 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/tracking/24_calibration.R  -  panel: calibration from an immobile sample
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of tracking_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Measuring the prefactor a and the wander floor per file (R/est_calib.R),
+## and calibration profiles.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     trk_cal_profiles
+##   READS from other parts:
+##     04_datasets_upload: trk_store
+##     06_filter_pipeline: trk_filter_params
+##     07_cycle_time_sequence: trk_seq_params
+##     15_msd: .msd_settings
+##     25_compare_cells: .cmp_read_file
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ============================================================================
 # INSTRUMENT CALIBRATION - a and D_w from an immobile sample, kept as profiles
 # ============================================================================

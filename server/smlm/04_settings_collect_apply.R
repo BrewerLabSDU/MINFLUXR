@@ -1,3 +1,27 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/04_settings_collect_apply.R  -  collect the settings for saving; defaults and apply functions
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## get_ui_settings (what the settings file holds), the defaults of each
+## settings group, and the functions that push a loaded or default settings
+## list back into the widgets.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     apply_cluster2_settings, apply_filters, apply_heatmap, apply_overlay,
+##     apply_overlay_settings, apply_two_color_settings, cluster2_defaults,
+##     filters_defaults_from_data, get_ui_settings, heatmap_defaults,
+##     overlay_defaults, two_color_defaults
+##   READS from other parts:
+##     01_view_upload: smlm_2d_crop_rv, trim_applied_rv, uploaded_df_rv
+##     03_dataset_zcal: commit_z_scale
+##     05_filter_pipeline: sd_filt
+##     11_dcr_split: dcr_note_written
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # --------- 3) COLLECT CURRENT UI SETTINGS ----------
 get_ui_settings <- reactive({
   req(uploaded_df_rv())

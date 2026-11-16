@@ -23,8 +23,13 @@
 ##   ui_smlm.R           smlm_ui  — SMLM fluidPage interior
 ##   ui_tracking.R       tracking_ui — Tracking fluidPage interior
 ##   ui.R                ui  — navbarPage wrapping both UIs
-##   server_smlm.R       smlm_server()   — SMLM reactive logic
-##   server_tracking.R   tracking_server() — Tracking reactive logic
+##   R/                  Computation with no Shiny state (estimators, SMLM statistics,
+##                       simulator generators); tested in tests/testthat
+##   server/             The bodies of the three server functions, as ordered part
+##                       files, one panel or core concern each (server/README.md)
+##   server_smlm.R       smlm_server()   — assembles server/smlm/
+##   server_tracking.R   tracking_server() — assembles server/tracking/
+##   sim_server.R        sim_server()    — assembles server/sim/
 ##   server.R            server()  — delegates to both sub-servers
 ## ─────────────────────────────────────────────────────────────────────────────
 

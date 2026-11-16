@@ -1,3 +1,21 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/13_image_overlay.R  -  confocal image overlay
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Reading the overlay image and its metadata, placing it behind the
+## localizations, automatic alignment and the nudge buttons.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     image_overlay
+##   READS from other parts:
+##     10_triggers_stores: smlm_diag, smlm_diag_mats
+##     17_plottable_data: plottable_data
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # Reads, optionally rotates, and prepares a data-URI + pixel size
 confocal_meta <- reactive({
   file <- input$bg_image

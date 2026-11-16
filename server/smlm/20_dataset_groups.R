@@ -1,3 +1,25 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/20_dataset_groups.R  -  dataset groups and the per-file summary
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Named groups of files, their colours and palettes, relabelling a result
+## table by group, and the per-file summary export.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     apply_dataset_groups, file_group_map, file_palette, series_palette
+##   READS from other parts:
+##     01_view_upload: smlm_file_store
+##     24_batch_nn: nn_batch_results
+##     25_counts_detection_time: tid_count_results
+##     28_crowding_size_nn: crowd_results, size_nn_results
+##     30_radius_gyration: rog_results
+##     34_two_colour: cross_nn_results
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 ## ── Dataset Groups (shared across Analysis-tab analyses) ──────────────────
 # Keep the 6 group file-selectors populated with the loaded file names.
 observeEvent(smlm_file_store(), {

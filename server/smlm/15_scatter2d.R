@@ -1,3 +1,28 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/15_scatter2d.R  -  main 2D plot
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## output$scatter2D, the live scale bar and the 2D crop-to-view.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     (nothing)
+##   READS from other parts:
+##     01_view_upload: smlm_2d_crop_rv, smlm_axis_x_span,
+##                     smlm_default_x_span, smlm_push_scale_bar,
+##                     smlm_zoom_ranges
+##     02_multiplex: .mplex_clu_memo
+##     03_dataset_zcal: uploaded_df
+##     10_triggers_stores: plot_trigger, smlm_diag
+##     13_image_overlay: image_overlay
+##     14_gt_estimator: add_gt_overlay_2d
+##     17_plottable_data: plottable_data
+##     18_nn_tables: secondary_nn_lines
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # What the 2D view last showed: the multiplex point-set key and view plane of
 # the last render, and the view plane a zoom was made in. Used to keep the
 # zoom across a re-render of the same data (see the layout step below).

@@ -1,3 +1,22 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/smlm/30_radius_gyration.R  -  panel: radius of gyration
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of smlm_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## Run handler, histogram, small-N note and download.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     build_rog_hist_fig, rog_results
+##   READS from other parts:
+##     01_view_upload: smlm_file_store
+##     20_dataset_groups: apply_dataset_groups, series_palette
+##     23_prepared_cache: .small_n_note, cluster2_label, deblink_label,
+##                        deblink_on, prepared_df
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 ## ── Radius of Gyration ────────────────────────────────────────────────────
 rog_results <- reactiveVal(NULL)
 rog_params  <- reactiveVal(NULL)   # compute params, frozen at Run

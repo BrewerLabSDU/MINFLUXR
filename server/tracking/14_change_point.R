@@ -1,3 +1,23 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## server/tracking/14_change_point.R  -  panel: change-point segmentation
+## ─────────────────────────────────────────────────────────────────────────────
+## Part of tracking_server(). Not a standalone script: its statements are evaluated in
+## the server function's environment, in file-name order (server/parts.R).
+##
+## cpd_segments_rv (R/est_cpd.R), the mixture over segment D, histogram,
+## summary and download.
+##
+## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
+##   DEFINES for other parts:
+##     (nothing)
+##   READS from other parts:
+##     01_state_sigma: trk_sigma_loc_eff
+##     06_filter_pipeline: trk_spatial_filtered
+##     07_cycle_time_sequence: trk_blur, trk_cycle_time
+##     10_triggers: has_z
+## END INTERFACE
+## ─────────────────────────────────────────────────────────────────────────────
+
 # ---------------------------------------------------------------------------
 # ---- Change-point segmentation + GMM clustering ---------------------------
 # Splits each track into diffusion-state segments via PELT on log(r²/Δt),
