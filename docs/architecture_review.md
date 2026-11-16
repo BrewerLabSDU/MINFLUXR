@@ -802,3 +802,77 @@ loading one once in the refactored app would close that.
   by name inside `testServer`) keep working because the parts share the server
   function's environment. They will need touching when a part becomes a
   function with arguments.
+
+## 9. Fixes made after the review (2026-11-16)
+
+Decided with Viktor after reading sections 3 and 5. Each is one commit; the golden
+entries that moved are named in the commit message, and nothing else moved.
+
+| Item | Commit | What changed |
+|---|---|---|
+| B4 | `7243aac` | sigma_loc is published on the first run. `ignoreInit = TRUE` removed from the CVE observer and from the MSD observer, which had the same defect. |
+| B5 | `e12b950` | The change-point CSV export classifies only segments with a finite log10 D; the others get NA. |
+| P1 / Q1 / S4 | `b4eea25` | One SMLM filter chain. See below. |
+| docs | `409ad95` | The method and simulator docs point at `server/<tab>/` and `R/`. |
+
+### 9.1 The SMLM filter chain (P1)
+
+Intended order, as stated by Viktor: metadata ranges, outlier trimming, trace
+length, trace spread; and the filters set in the Display tab apply to every
+loaded file.
+
+What the review missed and the fix found: `target_sd_x` / `target_sd_y`, which the
+batch chain used for its spread filter, have **no widget** in the UI. In the app
+the spread filter therefore never reached any all-files panel. And because the
+batch chain always applied the metadata ranges, sliders left untouched clipped
+every other file to the active file's range.
+
+Now (R/smlm_filters.R, "THE SMLM FILTER STAGES"):
+- `smlm_filter_meta()`, `smlm_filter_trim()`, `smlm_filter_length()`,
+  `smlm_filter_spread()` are the only implementation of each stage. The active
+  file's reactives call them one by one (the panels need the intermediate
+  results); `apply_meta_filters_batch()` composes them.
+- The server filters a stored file through `batch_filters()`
+  (server/smlm/23_prepared_cache.R), which passes the spread ranges (`sd_filt`)
+  and the active dataset's full metadata ranges (`meta_full_rng`). Both are in
+  the cache key of `prepared_df()`.
+- A metadata slider equal to the active dataset's full range is untouched and
+  filters no file. Once narrowed it applies to all files as numbers.
+- Length before or after spread gives the same result: both drop whole traces
+  judged on the same trimmed points. The active chain's reactives were left in
+  their existing order (spread, then length) because the length slider takes its
+  range from the spread-filtered data; the composed chain uses the stated order.
+- `target_sd_x` / `target_sd_y` stay in the settings spec so older settings files
+  and scripts read as before. They are used only when `apply_meta_filters_batch()`
+  is called without spread ranges, which the app no longer does.
+
+Still different between the two chains, and still open:
+- **Crops** (3D box/sphere, 2D crop to view) apply to the main plot only.
+- **Rogue removal** applies to the main plot only. It is not in
+  `SMLM_SETTINGS_SPEC`, so applying it to the batch chain also means adding
+  `remove_rogues`, `rogue_rule`, `rogue_factor` to the spec and the cache key.
+- `make_positive` shifts coordinates for display in the main plot only.
+- Density thinning applies to the batch chain only (it exists to make files
+  comparable).
+
+### 9.2 Change-point segmentation and dark cycles (S1, S2)
+
+Tested instead of argued: `tests/validation/cpd_dark_cycle_clustering.R`.
+One free population, fraction of tracks cut:
+
+| D (nm²/ms) | σ (nm) | no dark cycles | spread evenly | clustered late |
+|---|---|---|---|---|
+| 20 | 3 | 0.125 | 0.090 | 0.290 |
+| 20 | 6 | 0.105 | 0.130 | 0.590 |
+| 215 | 3 | 0.065 | 0.070 | 0.065 |
+| 215 | 6 | 0.060 | 0.045 | 0.120 |
+
+So S1 as written was too broad. Evenly spread dark cycles do no harm. A false
+state change appears only when dark cycles cluster in one part of the track AND
+localization noise dominates the step (slow molecules). At D around 0.2 µm²/s
+the effect is small. Nothing was changed in the estimator.
+
+S2 (segments with D clamped to 0 leave the mixture) matters only for a sample
+with an immobile fraction: in a 50/50 immobile/mobile simulation 55% of the
+immobile segments were dropped and the mixture put the immobile share at 0.35
+instead of 0.53. Not changed.
