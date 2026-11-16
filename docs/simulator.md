@@ -1,7 +1,7 @@
 # MINFLUX Simulator — Reference
 
 *Reference for the Simulator tab: what it models, how each stage works, and where it departs from
-real MINFLUX (§7).* Code: [`sim_server.R`](../sim_server.R), [`sim_ui.R`](../sim_ui.R) ·
+real MINFLUX (§7).* Code: [`server/sim/`](../server/sim/) (session logic), [`R/sim_*.R`](../R/) (generators), [`sim_ui.R`](../sim_ui.R) ·
 Companions: [simulation_module.md](simulation_module.md) (the diffusion simulator),
 [MINFLUX_analysis_methods.md](MINFLUX_analysis_methods.md) (the analysis side).
 
@@ -34,7 +34,7 @@ disagree about how MINFLUX works, Phase 2 is right.
 
 ## 1. Phase 1 — the SMLM generative pipeline
 
-One pass of `sim_result()` ([`sim_server.R:1000`](../sim_server.R#L1000)) runs seven stages. Each is a
+One pass of `sim_result()` ([`server/sim/02_smlm_simulation.R`](../server/sim/02_smlm_simulation.R)) runs seven stages. Each is a
 separate, inspectable model; understanding which stage a parameter acts on is most of understanding
 the tab.
 
@@ -57,7 +57,7 @@ the tab.
 ### 1.1 Ground truth (stage 1)
 
 Nine generators, all centred on the origin, 2D or 3D
-([`sim_server.R:374-657`](../sim_server.R#L374)): cluster, ring, arc, double ring, ellipse/ellipsoid,
+([`R/sim_structures.R`](../R/sim_structures.R)): cluster, ring, arc, double ring, ellipse/ellipsoid,
 hollow sphere, filament (with optional helical twist and random-walk lateral curl), oligomeric ring
 stack, and **image-guided** (`gen_from_image`) which samples molecule positions with probability
 proportional to pixel intensity of a loaded confocal image.
@@ -75,13 +75,13 @@ linker on a 10 nm-radius ring blurs the ring both inward and outward and fills t
 inflates the apparent radius instead. Both are real, for different labels.
 
 **Multi-copy** places N independently rotated copies at random positions in a tile
-([`sim_server.R:1150-1219`](../sim_server.R#L1150)). Copy 1 is deliberately kept near the origin
+(in `sim_result()`, [`server/sim/02_smlm_simulation.R`](../server/sim/02_smlm_simulation.R)). Copy 1 is deliberately kept near the origin
 (±50 nm) because a real ROI is usually centred on a feature. Per-copy rotation also rotates the
 `ldir` vectors and the per-copy structure centre, so the label-direction model survives the copy.
 
 ### 1.2 Labeling (stage 2)
 
-`expand_to_fluorophores()` ([`sim_server.R:693`](../sim_server.R#L693)) turns molecules into
+`expand_to_fluorophores()` ([`R/sim_labeling.R`](../R/sim_labeling.R)) turns molecules into
 **fluorophores**, and *one fluorophore = one future trace ID*. Presets come from
 `minflux_label_presets()` in `helpers_shared.R` — a single source of truth shared with the SMLM tab's
 inverse GT estimator, so the estimator inverts exactly what this generates.
@@ -197,16 +197,16 @@ so averaging over localizations cannot remove them, and time-to-resolve has a ha
 
 A **steric check** compares the label footprint + protein diameter against the mean GT
 nearest-neighbour distance and warns when stoichiometric labeling is physically impossible at that
-density ([`sim_server.R:1419`](../sim_server.R#L1419)).
+density (in `sim_result()`, [`server/sim/02_smlm_simulation.R`](../server/sim/02_smlm_simulation.R)).
 
 ### 1.3 TID multiplication (stage 3)
 
 Real MINFLUX over-counts: one physical dye can be re-acquired many times and appears as several
 `tid`s. Two mutually exclusive models, selected by the mode:
 
-- **Normal mode — `split_for_blinking()`** ([`sim_server.R:827`](../sim_server.R#L827)). Each
+- **Normal mode — `split_for_blinking()`** ([`R/sim_labeling.R`](../R/sim_labeling.R)). Each
   fluorophore gets `K ~ Poisson(λ)` extra TIDs at the **same position**. Apparent TIDs ≈ (1+λ) × dyes.
-- **Acquisition mode — rate × duration sampling** ([`sim_server.R:1298`](../sim_server.R#L1298)).
+- **Acquisition mode — rate × duration sampling** (in `sim_result()`, [`server/sim/02_smlm_simulation.R`](../server/sim/02_smlm_simulation.R), with `sim_sample_detection_times()` in [`R/sim_acquisition.R`](../R/sim_acquisition.R)).
   Each pool fluorophore gets a photon budget `k_i = 1 + Poisson(blinks−1)`; the requested number of
   detections `n_req` is drawn **without replacement** from that capacity, so dyes with a larger budget
   are found sooner and the total saturates at `Σk_i`.
@@ -279,7 +279,7 @@ limit for now" from "not resolvable with this label".
 
 ### 1.5 Localizations (stage 5)
 
-`gen_localizations()` ([`sim_server.R:848`](../sim_server.R#L848)) draws a trace length per
+`gen_localizations()` ([`R/sim_labeling.R`](../R/sim_labeling.R)) draws a trace length per
 fluorophore and scatters that many points around it:
 
 - **Poisson(λ)** by default; **Geometric(1/λ)** with the "heavy-tailed trace length" toggle — same
@@ -300,7 +300,7 @@ all real TIDs and carry `mol_id = NA`, so scoring excludes them.
 
 - **RMSE** — per-TID distance between the trace median and its source GT molecule (real TIDs only,
   capped at 1000 sampled TIDs).
-- **Precision budget** ([`sim_server.R:2594`](../sim_server.R#L2594)) — a bar chart of the error terms
+- **Precision budget** (`output$sim_precision_budget`, [`server/sim/05_smlm_outputs.R`](../server/sim/05_smlm_outputs.R)) — a bar chart of the error terms
   as **radial RMS**, their quadrature sum, the observed RMS overlaid, the **label floor**, and a
   **resolvability verdict** comparing GT nearest-neighbour spacing against 2× the per-molecule error.
   The formula and its validation are in §7.10.
@@ -320,7 +320,7 @@ all real TIDs and carry `mol_id = NA`, so scoring excludes them.
 ## 3. The acquisition model
 
 All three rate profiles are one family, `r(t) = struct_rate · g(t)`, with `g` normalised to the
-**characteristic** rate ([`sim_server.R:111`](../sim_server.R#L111)):
+**characteristic** rate (`acq_shape()`, [`R/sim_acquisition.R`](../R/sim_acquisition.R)):
 
 | Model | `g(t)` | Characteristic rate | Physical picture |
 |---|---|---|---|
@@ -328,7 +328,7 @@ All three rate profiles are one family, `r(t) = struct_rate · g(t)`, with `g` n
 | `constant` | `1` | the flat rate | variation is Poisson only |
 | `rise` | `1 − (1−level)·e^{−t/τ}` | the **plateau** | activation-limited (buffer, photoactivation) |
 
-`compute_acq_timeline()` ([`sim_server.R:158`](../sim_server.R#L158)) then integrates deterministically
+`compute_acq_timeline()` ([`R/sim_acquisition.R`](../R/sim_acquisition.R)) then integrates deterministically
 (no per-realization jitter, so the curve is stable while you drag sliders):
 
 ```
@@ -348,7 +348,7 @@ rate/duration/background respond without re-Generating. See §7.5 for the conseq
 
 ## 4. Calibrate from a real run
 
-`analyze_real_run()` ([`sim_server.R:244`](../sim_server.R#L244)) accepts a real `.npy` / `.json` /
+`analyze_real_run()` ([`R/sim_acquisition.R`](../R/sim_acquisition.R)) accepts a real `.npy` / `.json` /
 `.csv` and measures, from first-detection time per `tid`, everything below.
 
 **Reading conventions.** The loader mirrors the SMLM tab: `.npy` / `.json` are read with
@@ -373,7 +373,7 @@ its producer applied — the same run would then yield a different σ_z per form
 > `sim_crlb_z_factor` (also ≈0.7) is the σ_z/σ_xy *precision ratio*. They are unrelated and must not
 > be conflated.
 
-**The calibration gate** (`gate_real_run()`, [`sim_server.R:1559`](../sim_server.R#L1559)) restricts
+**The calibration gate** (`gate_real_run()`, [`R/sim_acquisition.R`](../R/sim_acquisition.R)) restricts
 *which* localizations and traces those statistics come from, in two stages:
 
 1. **EFO** and **CFR** ranges gate individual localizations.

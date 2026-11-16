@@ -59,7 +59,7 @@ raw extent/MSD alone.
 ## 2. Architecture & integration
 
 - New tab **"Diffusion / Tracking"** in `sim_ui.R` (alongside MINFLUX / Confocal / Acquisition /
-  Compare strategies), driven from `sim_server.R`.
+  Compare strategies), driven from `server/sim/06_tracking_simulation.R`.
 - **Reuse** the existing MINFLUX precision model: σ_loc = L_TCP / (a·√N_photons), a = √8 (`TCP_CRLB_PREFACTOR`,
   shared with the Tracking tab). Photon count N per localization ties to EFO·t_dwell; σ_loc is therefore
   **heteroscedastic** (varies per localization), like reality.
@@ -179,7 +179,7 @@ Subsample the fine ground-truth path the MINFLUX way:
   v_true?, n_dark_frac, sigma_loc_med)` for scoring.
 - Buttons: *Tracks (CSV)* and *Ground truth (CSV)*. Load the tracks CSV into the Tracking tab to analyse them.
 
-### 6a. Built-in CVE round-trip (`sim_trk_cve`, `sim_server.R:3128`)
+### 6a. Built-in CVE round-trip (`sim_trk_cve`, `server/sim/06_tracking_simulation.R`)
 
 The simulator scores itself: it runs the same CVE estimator the Tracking tab uses over the tracks it
 just generated, so the recovered D can be compared against the D that was dialled in. That is the

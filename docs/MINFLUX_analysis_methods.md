@@ -40,8 +40,9 @@ given question.
 
 # Part I - Implementation
 
-*What each tool computes, as coded. Formulas are transcribed from the source (`server_tracking.R`,
-`server_smlm.R`, `R/smlm_*.R`, `sim_server.R`); each entry links its Part II section.
+*What each tool computes, as coded. Formulas are transcribed from the source (`server/tracking/`,
+`server/smlm/`, `server/sim/` for the session logic; `R/est_*.R`, `R/smlm_*.R`, `R/sim_*.R` for the
+computation); each entry links its Part II section.
 Units in code: positions in **nm**, time internally in **ms** (imported `tim` is seconds → ×1000). D is
 carried internally in **nm²/ms** and displayed in **µm²/s**, with `D_um2_s = D_nm2ms / 1e3`
 (1 µm²/s = 10³ nm²/ms).*
@@ -263,7 +264,8 @@ run, with an interval.
   produces, so on a badly drifting file the estimate is a **lower bound**.
 
 ### I-A.2f Fiducial / contaminant scan (QC) — [Part II §6.8]
-`observeEvent(input$run_fiducial)` in `server_smlm.R`. Per trace: localization count, duration, median
+`observeEvent(input$run_fiducial)` in `server/smlm/27_fiducial_qc.R`, computed by `fiducial_scan_file()`
+(`R/smlm_filters.R`). Per trace: localization count, duration, median
 `efo`/`cfr`, centroid, spread.
 - **Lifetime (primary).** A fiducial does not bleach, so the sequence keeps re-finding it and its trace
   outlives every real fluorophore in the same acquisition. Flag when
@@ -1151,7 +1153,7 @@ The two simulators use **different** precision constants, deliberately:
   photon-independent floor (drift, vibration); both are fitted from a real run as the slope and intercept
   of within-trace variance against 1/N. One σ is used for every localization. See [simulator.md](simulator.md) §1.4.
 
-### I-C.1 SMLM structure + labelling simulator (`sim_server.R`, SMLM tab)
+### I-C.1 SMLM structure + labelling simulator (`server/sim/02_smlm_simulation.R`, generators in `R/sim_*.R`; SMLM tab)
 Generates a *known* super-resolution scene to validate the SMLM estimators and the GT inverse.
 - **Structures:** sphere/shell, ring, double-ring (Z- or Y-separated), stacked rings (helix-like),
   filament (random-walk backbone), each with a chosen point count and geometry.
@@ -1172,7 +1174,7 @@ Generates a *known* super-resolution scene to validate the SMLM estimators and t
 - **Output:** MINFLUX-format `data.frame(tid, tim[s], x, y[,z], efo, eco)` + a molecule/fluorophore
   ground-truth sidecar — loads straight into the SMLM tab so the GT inverse can be scored against truth.
 
-### I-C.2 Diffusion / tracking ground-truth simulator (`sim_server.R`, Diffusion tab)
+### I-C.2 Diffusion / tracking ground-truth simulator (`server/sim/06_tracking_simulation.R`, Diffusion tab)
 Simulates a *known* diffusion process on a *known* geometry, samples it with **MINFLUX's own pathologies**,
 and emits MINFLUX-format tracks so they flow through the *exact same* Tracking analysis — closing the
 validation loop (see [simulation_module.md](simulation_module.md) for the full description).
