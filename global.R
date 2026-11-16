@@ -27,6 +27,12 @@ source("R/est_hmm.R")        # continuous-time diffusive-state HMM
 source("R/est_percell.R")    # per-cell (per-file) summaries for comparing conditions
 source("R/est_calib.R")      # instrument calibration (prefactor a, wander floor) from an immobile sample
 source("R/smlm_settings.R")  # SMLM settings: one set of defaults for the UI, helpers and reset buttons
+# The simulator's generators (no Shiny state), moved out of sim_server().
+source("R/sim_acquisition.R")  # detection-rate model, calibration from a real run
+source("R/sim_structures.R")   # ground-truth structure generators
+source("R/sim_labeling.R")     # labelling presets, blinking, localizations
+source("R/sim_optics.R")       # confocal rendering, local density
+source("R/sim_tracking.R")     # tracking-simulation building blocks
 source("ui_smlm.R")
 source("ui_tracking.R")
 source("sim_ui.R")
