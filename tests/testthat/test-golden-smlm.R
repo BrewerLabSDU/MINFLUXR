@@ -121,7 +121,7 @@ test_that("SMLM tab: filters, trimming and crops reproduce their golden datasets
     res$default_active <- .grab(.smlm_cols(plottable_data()))
     rng <- range(store[[1]]$efo)
     set_inputs(session, list(efo_range = c(rng[1] * 1.3, rng[2] * 0.8), trim_outliers = TRUE,
-                             tid_length_range = c(8, 40), remove_rogues = TRUE, view_SD = TRUE))
+                             tid_length_range = c(8, 40), view_SD = TRUE))
     sd_filt$x <- c(0, 6); sd_filt$y <- c(0, 6)
     smlm_2d_crop_rv(list(x = c(100, 500), y = c(100, 600)))
     session$flushReact()
@@ -132,6 +132,12 @@ test_that("SMLM tab: filters, trimming and crops reproduce their golden datasets
     res$filtered_batch_A <- .grab(.smlm_cols(prepared_df(names(store)[1])))
     res$filtered_batch_B <- .grab(.smlm_cols(prepared_df(names(store)[2])))
     res$trim_flags       <- .grab(sum(trim_flags()))
+    # The crop is the ONLY thing the main plot applies that the all-files chain
+    # does not: inside the crop box the two hold the same localizations.
+    cr <- smlm_2d_crop_rv()
+    b  <- prepared_df(names(store)[1], needs_cluster = FALSE)
+    b  <- b[b$x >= cr$x[1] & b$x <= cr$x[2] & b$y >= cr$y[1] & b$y <= cr$y[2], ]
+    expect_setequal(paste(b$tid, signif(b$x, 12)), paste(plottable_data()$tid, signif(plottable_data()$x, 12)))
   })
   res <- as.list(res)
   expect_identical(.golden_errors(res), character(0))
@@ -140,7 +146,7 @@ test_that("SMLM tab: filters, trimming and crops reproduce their golden datasets
 
 # CLAIM: the filters set in the Display tab mean the same on the main plot and in
 # every all-files panel. For the active file the two chains keep exactly the same
-# localizations (crops and rogue removal aside, which belong to the main plot),
+# localizations (crops aside: a crop is set per dataset on the main plot),
 # and the same thresholds are applied to every other file.
 test_that("SMLM tab: the plot's filter chain and the all-files chain agree", {
   skip_if_no_app()

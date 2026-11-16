@@ -5,7 +5,7 @@
 ## PURPOSE
 ##   The metadata / outlier / length / spread filters applied before
 ##   clustering, the per-trace spread statistics and their plot overlays,
-##   rogue-trace removal and the localization-precision estimate.
+##   and the localization-precision estimate.
 ##
 ## CONTENTS (in file order)
 ##   compute_sd_medians, trace_spread_table, sd_breaks, sd_counts, grp_median,
@@ -13,7 +13,7 @@
 ##   trace_point_outliers, trim_summary, cov_ellipse_params, ellipse_xy,
 ##   density_hdr_2d, robust_median_cov, sigma_label_med_pm_sd,
 ##   add_sigma_iqr_lines, add_sigma_vline, add_median_vlines,
-##   apply_meta_filters_batch, remove_rogue_traces, geometric_median,
+##   apply_meta_filters_batch, geometric_median,
 ##   smlm_loc_precision_nm
 ##
 ## Part of the SMLM helpers; loaded by helpers_smlm.R (see its header for the data
@@ -388,7 +388,7 @@ sd_by_tid <- function(df, min_n = MIN_LOCS_FOR_SPREAD_DEFAULT, robust = FALSE) {
 #   "Is this point unlike the REST OF THIS TRACE" - not "unlike the dataset".
 #   A uniformly broad trace (drift, two molecules, a fiducial) then loses
 #   NOTHING here, because all of its points agree with each other; deciding its
-#   fate stays with the spread filter and the rogue rules. Only a trace that is
+#   fate stays with the spread filter. Only a trace that is
 #   tight apart from a few strays loses those strays. Measured on real data
 #   (imaging file A, k = 4): a dataset-wide sigma flags 7.6% of all
 #   localizations, this rule flags 3.4%, and the difference is almost entirely
@@ -991,63 +991,6 @@ apply_meta_filters_batch <- function(df, settings, full_rng = NULL, sd_ranges = 
     }
   }
   df
-}
-
-remove_rogue_traces <- function(df, rule = c("factor_median","mad_rule","axis_sd"),
-                                factor = 2.5, min_n = MIN_LOCS_FOR_SPREAD_DEFAULT,
-                                robust = TRUE) {
-  rule <- match.arg(rule)
-
-  # The per-trace spread MUST use the same estimator as the Stage-2 filter.
-  # These rules were robust ACROSS traces (median/MAD of the per-trace values)
-  # but the per-trace value itself was a plain sd, so a trace with 2 stray
-  # localizations that the spread filter deliberately kept would be deleted here
-  # instead - the two stages would silently disagree about what a rogue is.
-  spread <- sd_by_tid(df, min_n = 2L, robust = robust)
-  if (!nrow(spread)) return(list(df = df, removed_tids = character(0),
-                                 removed_n = 0L, note = "no traces"))
-  names(spread)[names(spread) == "n_locs"] <- "n"
-
-  keep <- rep(TRUE, nrow(spread))
-  note <- ""
-  
-  if (rule == "factor_median") {
-    med_all <- c(stats::median(spread$sd_x, na.rm = TRUE),
-                 stats::median(spread$sd_y, na.rm = TRUE),
-                 if ("z" %in% names(df)) stats::median(spread$sd_z, na.rm = TRUE) else NA)
-    thr_x <- factor * med_all[1]
-    thr_y <- factor * med_all[2]
-    thr_z <- if (!is.na(med_all[3])) factor * med_all[3] else Inf
-    keep <- (spread$sd_x <= thr_x) & (spread$sd_y <= thr_y) & (spread$sd_z <= thr_z | is.na(spread$sd_z))
-    note <- sprintf("factor_median (×%.2f)", factor)
-    
-  } else if (rule == "mad_rule") {
-    mx <- stats::median(spread$sd_x, na.rm = TRUE); madx <- stats::mad(spread$sd_x, na.rm = TRUE)
-    my <- stats::median(spread$sd_y, na.rm = TRUE); mady <- stats::mad(spread$sd_y, na.rm = TRUE)
-    if ("z" %in% names(df)) { mz <- stats::median(spread$sd_z, na.rm = TRUE); madz <- stats::mad(spread$sd_z, na.rm = TRUE) } else { mz <- NA; madz <- NA }
-    thr_x <- mx + factor * madx; thr_y <- my + factor * mady; thr_z <- if (!is.na(mz)) mz + factor * madz else Inf
-    keep <- (spread$sd_x <= thr_x) & (spread$sd_y <= thr_y) & (spread$sd_z <= thr_z | is.na(spread$sd_z))
-    note <- sprintf("mad_rule (median + %.2f × MAD)", factor)
-    
-  } else if (rule == "axis_sd") {
-    medx <- stats::median(spread$sd_x, na.rm = TRUE)
-    medy <- stats::median(spread$sd_y, na.rm = TRUE)
-    medz <- if ("z" %in% names(df)) stats::median(spread$sd_z, na.rm = TRUE) else NA
-    thr_x <- factor * medx; thr_y <- factor * medy; thr_z <- if (!is.na(medz)) factor * medz else Inf
-    keep <- (spread$sd_x <= thr_x) & (spread$sd_y <= thr_y) & (spread$sd_z <= thr_z | is.na(spread$sd_z))
-    note <- sprintf("axis_sd (any axis > %.2f × median(axis SD))", factor)
-  }
-  
-  keep <- keep & (spread$n >= min_n)
-  kept_tids <- spread$tid[keep]
-  removed_tids <- spread$tid[!keep]
-  
-  list(
-    df = df %>% dplyr::filter(tid %in% kept_tids),
-    removed_tids = removed_tids,
-    removed_n = length(removed_tids),
-    note = note
-  )
 }
 
 # =============================================================================

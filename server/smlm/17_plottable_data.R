@@ -4,7 +4,7 @@
 ## Part of smlm_server(). Not a standalone script: its statements are evaluated in
 ## the server function's environment, in file-name order (server/parts.R).
 ##
-## Crops, rogue removal, grouping and clustering (apply_clustering_pipeline),
+## Crops, grouping and clustering (apply_clustering_pipeline),
 ## then colours and hover text. Recomputes on plot_trigger only.
 ##
 ## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
@@ -15,7 +15,7 @@
 ##     02_multiplex: .mplex_clu_memo, .mplex_off_of, .mplex_residual_shift,
 ##                   .mplex_store_off
 ##     05_filter_pipeline: filtered_df
-##     10_triggers_stores: fit_log_rv, plot_trigger
+##     10_triggers_stores: plot_trigger
 ##     16_crop_range_ui: apply_trimmer
 ## END INTERFACE
 ## ─────────────────────────────────────────────────────────────────────────────
@@ -85,25 +85,7 @@ plottable_data <- eventReactive(plot_trigger(), {
     df <- df[df$x >= crop2d$x[1] & df$x <= crop2d$x[2] &
              df$y >= crop2d$y[1] & df$y <= crop2d$y[2], , drop = FALSE]
   if (nrow(df) == 0) return(df)
-  # Remove rogue traces
-  if (isTRUE(input$remove_rogues)) {
-    rr <- remove_rogue_traces(
-      df,
-      rule   = input$rogue_rule %||% "factor_median",
-      factor = input$rogue_factor %||% 2.5,
-      min_n  = input$sd_min_locs %||% SMLM_DEFAULTS$sd_min_locs,
-    )
-    df <- rr$df
-    #log text
-    fit_log_rv(
-      paste0(
-        "Rogue removal: removed ", rr$removed_n, " trace(s). Rule: ", rr$note
-      )
-    )
-  }
-  
-  if (nrow(df) == 0) return(df)
-  
+
   df <- assign_analysis_group(df, run_set)
   
   # Safety check
@@ -148,8 +130,7 @@ plottable_data <- eventReactive(plot_trigger(), {
       df$tid, df$tim, df$mplex_channel,                      # which rows
       if (".dataset_tag" %in% names(df)) df$.dataset_tag[1], # which build
       isolate(z_scale_applied()),
-      smlm_settings_key(mp_set),                             # every clustering setting
-      input$remove_rogues, input$rogue_rule, input$rogue_factor
+      smlm_settings_key(mp_set)                              # every clustering setting
     ), algo = "xxhash64")
   }
   memo <- .mplex_clu_memo

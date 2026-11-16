@@ -54,14 +54,6 @@ get_ui_settings <- reactive({
     trim_k           = input$trim_k,
     make_positive    = input$make_positive,
 
-    # ── Rogue-trace removal - THIS CHANGES THE DATA ────────────────────────
-    # Dropped traces are removed before grouping, clustering, fits and surfaces,
-    # so omitting these from the saved file meant reloading a settings file
-    # silently reverted rogue removal to OFF and changed what was analysed.
-    remove_rogues = isTRUE(input$remove_rogues),
-    rogue_rule    = input$rogue_rule,
-    rogue_factor  = input$rogue_factor,
-
     # ── Histogram + spread-panel display state ─────────────────────────────
     # apply_filters() already restores hist_variable/hist_bins/sd_* , but they
     # were never written out, so every load reset them to the data defaults.
@@ -536,13 +528,12 @@ apply_filters <- function(vals) {
   if (!is.null(vals$sd_y_range)) shinyWidgets::updateNumericRangeInput(session, "sd_y_range", value = rng(vals$sd_y_range))
   if (!is.null(vals$sd_z_range)) shinyWidgets::updateNumericRangeInput(session, "sd_z_range", value = rng(vals$sd_z_range))
 
-  # ── Rogue removal + panel display state ───────────────────────────────────
+  # ── Panel display state ───────────────────────────────────────────────────
   # Only restore when the key is actually present, so an OLD settings file (saved
-  # before these were persisted) leaves the current UI alone instead of silently
-  # switching rogue removal off.
-  if (!is.null(vals$remove_rogues)) updateCheckboxInput(session, "remove_rogues", value = isTRUE(vals$remove_rogues))
-  if (!is.null(vals$rogue_rule))    updateRadioButtons(session, "rogue_rule", selected = as.character(vals$rogue_rule))
-  if (!is.null(vals$rogue_factor))  updateNumericInput(session, "rogue_factor", value = as.numeric(vals$rogue_factor))
+  # before these were persisted) leaves the current UI alone.
+  # (Settings files written up to v0.7.0 may carry remove_rogues / rogue_rule /
+  # rogue_factor. Rogue removal was taken out of the app in 2026-11; those keys
+  # are ignored, and the file loads as before in every other respect.)
   if (!is.null(vals$show_metadata_hist)) updateCheckboxInput(session, "show_metadata_hist", value = isTRUE(vals$show_metadata_hist))
   if (!is.null(vals$hist_show_raw))      updateCheckboxInput(session, "hist_show_raw", value = isTRUE(vals$hist_show_raw))
   if (!is.null(vals$sd_use_q95))         updateCheckboxInput(session, "sd_use_q95", value = isTRUE(vals$sd_use_q95))

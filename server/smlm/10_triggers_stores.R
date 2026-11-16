@@ -114,19 +114,6 @@ observeEvent(
   },
   ignoreInit = TRUE
 )
-observeEvent(
-  list(input$remove_rogues, input$view_SD),
-  {
-    if (!isTRUE(input$remove_rogues) || !isTRUE(input$view_SD)) {
-      # only clear if the current message is the rogue-removal one
-      cur <- fit_log_rv()
-      if (is.character(cur) && length(cur) == 1 && grepl("^Rogue removal:", cur)) {
-        fit_log_rv("")
-      }
-    }
-  },
-  ignoreInit = TRUE
-)
 observeEvent(input$enable_two_color, {
   if (isTRUE(input$enable_two_color) && !is.null(input$color_mode) && input$color_mode != "default") {
     updateSelectInput(session, "color_mode", selected = "default")

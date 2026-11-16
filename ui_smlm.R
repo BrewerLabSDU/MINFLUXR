@@ -307,20 +307,7 @@ smlm_ui <- fluidPage(
                    )
                  ),
                  checkboxInput("sd_use_q95", "Set spread ranges to the 95th percentile", value = FALSE),
-                 uiOutput("sd_ranges_ui"),
-                 checkboxInput("remove_rogues", "Remove rogue traces by rule", value = FALSE),
-                 conditionalPanel(
-                   condition = "input.remove_rogues == true",
-                   radioButtons(
-                     "rogue_rule", "Rogue rule",
-                     choices = c("Spread > k \u00d7 dataset median"         = "factor_median",
-                                 "Spread > median + k \u00d7 MAD"  = "mad_rule",
-                                 "Any axis spread > k \u00d7 median(axis spread)" = "axis_sd"),
-                     selected = "factor_median"
-                   ),
-                   numericInput("rogue_factor", "Multiplier k", value = 2.5, min = 1, step = 0.1),
-                   helpText("k applies to whichever rule is selected above.")
-                 )
+                 uiOutput("sd_ranges_ui")
                ),
                actionButton("reset_filters", "Reset Filters", icon = icon("refresh"))
 

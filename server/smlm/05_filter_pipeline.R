@@ -124,7 +124,7 @@ metadata_filtered_df <- reactive({
 # outliers.
 #
 # This is the ONLY place localizations are removed for spatial reasons.
-# Trace-level judgement stays in Stage 2 and the rogue rules; the two are kept
+# Trace-level judgement stays in Stage 2 (the spread filter); the two are kept
 # apart so that trimming can never quietly rescue a trace that is not one
 # molecule - the trim FRACTION is reported precisely so that case stays visible.
 #

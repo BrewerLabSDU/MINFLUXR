@@ -164,10 +164,6 @@ moving emitters).
   tight traces - useful for removing gold beads or freely diffusing molecules. An empty box means no
   bound on that side (blank lower reads as 0, blank upper as no upper limit), so clearing both leaves
   that axis unfiltered. See [Trace Spread](#trace-spread-sd-filter).
-- **Remove rogue traces by rule** - an alternative to hand-set bounds. Three rules, each with a
-  multiplier *k*: spread > k × dataset median, spread > median + k × MAD (robust), or any single axis
-  spread > k × that axis's median. Dropped traces are removed **before** grouping, clustering, fits
-  and surfaces.
 
 **Download / Load Filter Settings** saves and restores, as JSON, every setting that changes results
 (filters, trimming, channel split, de-blinking, median clustering, density thinning, fiducial
@@ -1204,7 +1200,7 @@ separately, because axial and lateral precision differ.
 
 Optional, off by default. Flags individual localizations that do not fit their own trace, so a trace
 is not discarded whole because of a few stray points. It removes points only - deciding the fate of a
-whole trace stays with the spread filter and the rogue-trace rules.
+whole trace stays with the spread filter.
 
 For trace $t$ with $n_t$ localizations, the per-axis centre is the median and the distance is
 whitened per axis, so the anisotropy of MINFLUX precision does not leak into one threshold:
