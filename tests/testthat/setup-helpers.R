@@ -11,3 +11,9 @@ suppressMessages({
 skip_if_not_slow <- function()
   testthat::skip_if_not(identical(Sys.getenv("MINFLUXR_SLOW_TESTS"), "true"),
                         "slow test (set MINFLUXR_SLOW_TESTS=true)")
+# The source files of the SMLM server: the assembly file and its part files
+# (server/smlm/), relative to the repo root. Tests that guard the server's code
+# by reading it must read all of them.
+smlm_server_files <- function()
+  c("server_smlm.R", file.path("server", "smlm",
+      sort(list.files(file.path(.repo_root, "server", "smlm"), "^[0-9]{2}_.*[.]R$"))))

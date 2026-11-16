@@ -51,7 +51,8 @@ test_that("a reactive calling the pipeline depends only on the settings it uses"
 # (smlm_settings_from_input, in Run handlers) or the explicit lazy view
 # (as_smlm_settings(input), in reactives) - never bare `input`.
 test_that("server call sites never pass bare input to a settings helper", {
-  src <- readLines(file.path(.repo_root, "server_smlm.R"), warn = FALSE, encoding = "UTF-8")
+  src <- unlist(lapply(smlm_server_files(), function(f)                # assembly file + parts
+    readLines(file.path(.repo_root, f), warn = FALSE, encoding = "UTF-8")))
   src <- src[!grepl("^\\s*#", src)]
   fns <- c("apply_meta_filters_batch", "apply_clustering_pipeline", "resolve_channels",
            "assign_analysis_group", "assign_two_color_group", "deblink_threshold_for_channel",

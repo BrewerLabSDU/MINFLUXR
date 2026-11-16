@@ -8,8 +8,9 @@
 # differences and changes when any setting changes. The server side is exercised
 # end to end in test-smlm-server-smoke.R.
 
-.server_src <- function() paste(readLines(file.path(.repo_root, "server_smlm.R"), warn = FALSE,
-                                          encoding = "UTF-8"), collapse = "\n")
+# The server's source: the assembly file and its part files (server/smlm/).
+.server_src <- function() paste(unlist(lapply(smlm_server_files(), function(f)
+  readLines(file.path(.repo_root, f), warn = FALSE, encoding = "UTF-8"))), collapse = "\n")
 
 # A source that records every field the chain reads through the adapter.
 .reads <- new.env()
@@ -73,7 +74,8 @@ test_that("the chain reads only defined settings", {
 # with that same object; the hand-kept input list and its runtime scan are gone.
 test_that("prepared_df keys and runs on one settings object", {
   src  <- .server_src()
-  body <- regmatches(src, regexpr("prepared_df <- function\\((.|\\n)*?\\n  \\}\\n", src, perl = TRUE))
+  # the function ends at the first closing brace in column 0 (part files are not indented)
+  body <- regmatches(src, regexpr("prepared_df <- function\\((.|\\n)*?\\n\\}\\n", src, perl = TRUE))
   expect_match(body, "s <- smlm_settings_from_input(input)", fixed = TRUE)
   expect_match(body, ".prep_key(fname, needs_cluster, two_color, s)", fixed = TRUE)
   expect_match(body, "apply_meta_filters_batch(df, s)", fixed = TRUE)

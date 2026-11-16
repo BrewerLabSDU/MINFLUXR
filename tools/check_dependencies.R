@@ -19,7 +19,10 @@
 
 files <- c("helpers_shared.R", "helpers_smlm.R", "helpers_tracking.R",
            "ui_smlm.R", "ui_tracking.R", "sim_ui.R", "ui.R",
-           "server_smlm.R", "server_tracking.R", "sim_server.R", "server.R", "global.R")
+           "server_smlm.R", "server_tracking.R", "sim_server.R", "server.R", "global.R",
+           # the bodies of the three server functions and the computation in R/
+           list.files("server", "[.]R$", recursive = TRUE, full.names = TRUE),
+           list.files("R", "[.]R$", full.names = TRUE))
 files <- files[file.exists(files)]
 if (!length(files)) stop("Run this from the repository root.")
 

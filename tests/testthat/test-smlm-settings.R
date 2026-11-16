@@ -95,7 +95,8 @@ test_that("no literal defaults for defined settings in helpers or server", {
   helper_parts <- setdiff(file.path("R", list.files(file.path(.repo_root, "R"), "^smlm_.*\\.R$")),
                           "R/smlm_settings.R")
   expect_gt(length(helper_parts), 10)
-  hits <- unlist(lapply(c(helper_parts, "server_smlm.R"), function(f)
+  expect_gt(length(smlm_server_files()), 30)              # the server is read part by part
+  hits <- unlist(lapply(c(helper_parts, smlm_server_files()), function(f)
     regmatches(.read_src(f), gregexpr(pat, .read_src(f), perl = TRUE))[[1]]))
   allowed <- c("input$tid_length_range %||% c(0", "input$minpts2 %||% 4L")
   expect_equal(setdiff(hits, allowed), character(0))

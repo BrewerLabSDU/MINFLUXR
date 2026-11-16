@@ -1,6 +1,7 @@
 # MINFLUXR architecture review
 
-Status: Phase 1 (review). Sections 6 to 8 are filled in as the refactor proceeds.
+Status: sections 1 to 5 were written before any change. Sections 6 to 8 describe
+the refactor on branch `refactor/modules` and what it left.
 
 All `file:line` references are to the tree at commit `7e8b6f9` (v0.7.0 plus one
 commit), before any refactoring. After the split, find the same code by name:
@@ -623,12 +624,181 @@ settings and compare `global_p`.
 
 ## 6. What was done
 
-(filled in during Phase 3)
+Branch `refactor/modules`, on top of `7e8b6f9`. No analysis method, default or
+number was changed; the golden files written from the untouched code were never
+regenerated.
+
+| Commit | Step of 4.2 | What |
+|---|---|---|
+| `0879bd5` | - | This review and `tools/server_map.R` |
+| `af5dfb9` | 1 | Golden-output and smoke tests |
+| `f157e3e` | 2 | 30 simulator functions and presets moved from `sim_server()` to `R/sim_*.R` |
+| `273f24a` | 3 | 39 stateless tracking functions moved from `tracking_server()` to `R/trk_*.R`, `R/est_transport.R` |
+| `463a365` | 4 | The three server functions split into 65 ordered part files under `server/` |
+| `3807136` | 4 | Part headers with generated DEFINES / READS blocks, `server/README.md`, structure tests |
+| `173dee2` | 5 (part) | Six tracking computations moved from reactives into `R/`, with ground-truth tests |
+
+### 6.1 Safety net (step 1)
+
+- `tests/testthat/helper-app.R`: loads the app once; `ui_input_defaults()` reads the
+  start value of every static widget from the UI tag tree, so a `testServer`
+  session starts with the inputs the app starts with instead of the `%||%`
+  fallbacks (B2); `expect_golden()` compares a fingerprint of each result (counts,
+  sums, sums of squares, quantiles, first values per numeric vector; value tables
+  for text) at relative tolerance 1e-8.
+- `test-golden-tracking.R`: upload through the tab's own path, Plot Data, every
+  Run button; 30 results of the main session, the cleaning/filter stages with
+  non-default settings, calibration and Compare Cells, and the `R/est_*.R`
+  estimators called directly.
+- `test-golden-smlm.R`: the active-file chain (19 results), every batch panel on
+  two files (33 results, envelopes on), and both chains with filters, trimming,
+  rogue removal and a crop.
+- `test-golden-sim.R`: SMLM simulation for the default and each structure
+  generator, the strategy comparison and the tracking simulation, at fixed seeds.
+  These pin the order of the random draws.
+- `test-smoke-servers.R`: after all panels have been triggered, every output of
+  each server (110 tracking, 139 SMLM, 24 simulator; ids read from the code) is
+  rendered and its status (ok / silent / error) compared with the stored one.
+- Mutation checks: changing a quantile probability from 0.25 to 0.2501 in the MSD
+  curve, and one argument in a server call, each fail the tracking golden.
+
+shinytest2 was not used: a headless browser is not usable on this machine. The
+checks are `testServer` plus one HTTP fetch of the running app's UI (200, all
+three tabs present).
+
+### 6.2 Structure (steps 2 to 4)
+
+| | Before | After |
+|---|---|---|
+| `server_smlm.R` | 13,996 | 147 (header and assembly) + 34 parts, 14,571 lines, largest 1,516 |
+| `server_tracking.R` | 11,573 | 161 + 25 parts, 11,044 lines, largest 1,303 |
+| `sim_server.R` | 4,254 | 24 + 6 parts, 3,220 lines, largest 1,220 |
+| `R/` | 15,539 in 23 files | 17,884 in 35 files |
+| `tests/testthat/` | 2,795 in 36 files | 3,756 in 43 files, plus 13 golden files (125 kB) |
+
+The part totals include about 23 header lines per part. The one part over 1,500
+lines is `server/smlm/19_scatter3d.R`, which is a single statement (the 3D render).
+
+How the moves were verified, beyond the tests:
+- Functions moved to `R/`: each was checked with `codetools::findGlobals` to read
+  no `input`, `output`, `session` or closure object other than functions moved
+  with it; the moved text parses to the same expression as the original
+  statement; the closure's remaining statements are the original ones minus the
+  moved ones, in order; no top-level name is defined in two files.
+- The split: the parsed statements of all parts in file order, plus the
+  statements left in the server function, are identical to the parsed statements
+  of the original closure; and every non-blank line of the original body
+  (comments included) is present in the parts, in order.
+
+Parts are "Stage A" of section 4.1: evaluated in the server function's
+environment in the original order. `server/parts.R` documents the mechanism and
+`server/README.md` the working rules. Each part's header carries a generated
+interface block; `test-server-parts.R` fails when a block is out of date, a part
+exceeds 1,600 lines, or a server-level name is defined twice in a tab.
+
+Three existing guard tests read the text of `server_smlm.R` (`test-smlm-cache-key.R`,
+`test-smlm-settings-adapter.R`, `test-smlm-settings.R`). After the split two of
+them failed and the third passed without looking at any server code. All three
+now read the assembly file plus the parts (`smlm_server_files()` in
+`setup-helpers.R`); their claims are unchanged. `tools/check_dependencies.R`
+scans `server/` and `R/` as well. A guard that greps one file by name is a
+pattern to watch when files move.
+
+### 6.3 Computation moved out of reactives (step 5, partly)
+
+| Function | File | Was in |
+|---|---|---|
+| `dir_compute()` | `R/est_directionality.R` | `dir_bundle` |
+| `cycle_class_counts()` | `R/trk_stats.R` | `cycle_class_bundle` |
+| `msd_unified_curves()` | `R/est_msd.R` | `msd_unified_bundle` |
+| `msd_pertrack_fits()` | `R/est_msd.R` | `trk_unified_tdiff` |
+| `cve_integrated_fraction()`, `cve_continuity_mean()` | `R/est_cve.R` | local functions of `trk_cve_bundle` |
+
+`test-tracking-extracted.R` tests them against known answers. One of its tests
+pins `msd_unified_curves()` to `msd_ensemble()`, so the duplication noted in P3
+can no longer drift without a failure.
+
+One difference in reactive wiring, with no effect on results: `trk_unified_tdiff`
+now reads `trk_blur()` once per run instead of once per fitted track.
+
+### 6.4 Settings files
+
+No statement of the settings save/load code was changed (it was moved as text
+into `server/smlm/04`, `06`, `08` and `server/tracking/09`). The existing
+round-trip test `test-smlm-settings-file.R` (slow suite) passes. There is no
+automated test that loads a settings file written by the released v0.7.0 build;
+loading one once in the refactored app would close that.
 
 ## 7. Deliberately left
 
-(filled in during Phase 3)
+- **True Shiny modules (`moduleServer` + `NS`).** Not done, for the reasons in 4.1.
+  The done-criterion "tabs/panels converted into Shiny modules" is met only in
+  the sense of one file per responsibility with a checked interface, not in the
+  sense of namespaced modules.
+- **Parts are contiguous runs of the original file.** Statements were not
+  reordered, so a few concerns are still spread over several parts (SMLM
+  settings over `04`, `06`, `08`; the two filter-reset observers in `03` and
+  `12`). Regrouping changes observer creation order and was left for a step
+  that can be checked by hand in the browser.
+- **The rest of step 5.** Still computing inside reactives: the per-track sigma
+  and linking QC of `trk_cve_bundle`, `conf_ci_bundle`, `trk_disp_bundle`,
+  `trk_disp_geom_null`, `trk_export_summary`, `seg_msd_rv`, `msd_cluster_rv`,
+  `msd_cluster_models`, `trk_seq_params`, and the six copies of the MSD
+  fit-window parsing.
+- **Steps 6 to 14 of 4.2**: the simulator bodies (`sim_result`, `sim_trk_result`),
+  SMLM inline computations, a shared Run-handler frame, the duplicated overlay /
+  scale-bar / z-calibration code of the two tabs, splitting the three large plot
+  renders, a settings spec for tracking.
+- **UI files** (`ui_smlm.R` 2,628 lines, `ui_tracking.R` 1,632, `sim_ui.R` 1,132)
+  are untouched: no automatic check of a UI change is available here.
+- **Three small SMLM helpers** (`gt_exploratory_note`, `.small_n_note`,
+  `.stale_badge`) and the multiplex parsers are stateless but were left in the
+  server, in line with the earlier decision to keep UI-note builders there.
+- **Dead code** (3.4) was not removed. Nothing listed there was deleted or
+  changed; the never-sourced files are still in the repo root.
+- **Bugs B1 to B5, questions Q1 to Q3 and issues S1 to S5** are recorded, not
+  fixed. B4, B5 and the fallback values of B2 are pinned by the golden and smoke
+  tests as current behaviour, so fixing one will (correctly) require
+  regenerating the affected golden entry.
+- The scan for global helper functions that are never called did not complete
+  and is not reported.
+- **File references in the other docs.** `docs/MINFLUX_analysis_methods.md`,
+  `docs/simulator.md` and `docs/simulation_module.md` still name
+  `server_smlm.R`, `server_tracking.R` and `sim_server.R` (some with line
+  numbers that were already out of date) as the place of the code. The function
+  and reactive names they give are unchanged and can be found with
+  `tools/server_map.R`; the docs themselves were not edited.
 
 ## 8. Remaining risks
 
-(filled in during Phase 3)
+- **What the tests cannot see.** `testServer` does not run JavaScript, so
+  `conditionalPanel` conditions, the plotly proxy calls of the play loop, relayout
+  events, file inputs and `renderUI`-created widgets are not exercised. The split
+  did not change any of that code, but it has not been clicked through. A manual
+  pass in the browser (upload a file in each tab, Plot, play, one Run button
+  per panel, save and load settings) is the missing check before merging.
+- **Start-up cost.** The parts are parsed once at app start and evaluated per
+  session with `eval()`. Session start was not timed.
+- **Coverage gaps of the goldens.**
+  - The simulated tracks all have the same length, so the rule that drops lags
+    reached by under 10% of the tracks is never active (found by a mutation that
+    did not fail). Tracks of mixed length would cover it.
+  - 2D data only in tracking (no real z), no multiplex dataset, no image
+    overlay, no sequence JSON, no calibration profile applied, no merged view.
+  - `scatter3D` is not rendered in the smoke test (it requires `input$file`),
+    so the shape fits and isosurfaces it computes are uncovered.
+  - Render status only for plots and HTML: a figure that draws the wrong thing
+    still counts as "ok".
+- **Goldens are tied to this machine's numerics** at 1e-8. Another BLAS or R
+  version may need a looser tolerance for the mixture and HMM fits.
+- **Test run time** rose from about 35 s to about 3.5 min for the default suite
+  (the app-level tests load every package and run every panel).
+  `MINFLUXR_SKIP_APP_TESTS=true` gives the old behaviour.
+- **Tool heuristics.** The interface blocks come from a static scope analysis.
+  A name used only through `get()`, `session$env` or a string is not seen. None
+  was found in the server code. The block is a checked description, not an
+  enforcement: all parts of a tab can still reach each other's objects.
+- **Tests that reach into the closure** (`prepared_df`, `trk_cve_bundle`, ...
+  by name inside `testServer`) keep working because the parts share the server
+  function's environment. They will need touching when a part becomes a
+  function with arguments.
