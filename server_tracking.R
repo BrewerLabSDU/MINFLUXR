@@ -275,36 +275,6 @@ tracking_server <- function(input, output, session) {
     else "not set"
   })
 
-  # Mean + SD + t-based 95% CI treating each element (a TRACK) as the independent
-  # unit - the honest CI for track-level statistics, since localizations within a
-  # track are correlated (the track, not the localization, is the sampling unit).
-  # Also returns median + quartiles for a robust summary.
-  .mean_ci <- function(x, conf = 0.95) {
-    x <- x[is.finite(x)]; n <- length(x)
-    if (n < 1L) return(list(mean = NA_real_, sd = NA_real_, se = NA_real_,
-                            lo = NA_real_, hi = NA_real_, n = 0L,
-                            median = NA_real_, q1 = NA_real_, q3 = NA_real_))
-    m  <- mean(x); md <- stats::median(x)
-    qs <- stats::quantile(x, c(0.25, 0.75), names = FALSE, na.rm = TRUE)
-    if (n < 2L) return(list(mean = m, sd = NA_real_, se = NA_real_, lo = NA_real_,
-                            hi = NA_real_, n = n, median = md, q1 = qs[1], q3 = qs[2]))
-    s  <- stats::sd(x); se <- s / sqrt(n)
-    tc <- stats::qt(1 - (1 - conf) / 2, df = n - 1)
-    list(mean = m, sd = s, se = se, lo = m - tc * se, hi = m + tc * se,
-         n = n, median = md, q1 = qs[1], q3 = qs[2])
-  }
-
-  # Percentile bootstrap CI of a statistic over the sampling units (TRACKS): x is a
-  # per-track vector, resampled with replacement B times. This is the honest way to
-  # put a CI on an ensemble number, because localizations within a track are
-  # correlated - the track is the independent unit, not the localization.
-  .boot_ci <- function(x, statfn = stats::median, B = 2000L, conf = 0.95) {
-    x <- x[is.finite(x)]; n <- length(x)
-    if (n < 3L) return(c(lo = NA_real_, hi = NA_real_))
-    bs <- vapply(seq_len(B), function(i) statfn(x[sample.int(n, n, replace = TRUE)]), numeric(1))
-    q  <- stats::quantile(bs, c((1 - conf)/2, 1 - (1 - conf)/2), names = FALSE, na.rm = TRUE)
-    c(lo = q[1], hi = q[2])
-  }
 
   # Per-track cycle-CONTINUITY score. A step spanning k acquisition cycles (k=1 =
   # integrated, k≥2 = k−1 dark cycles) is weighted w(k) = 2^(−(k−1)/H), H = the
@@ -315,21 +285,6 @@ tracking_server <- function(input, output, session) {
   # a named vector (tid → score). Half-life 0/NA → binary integrated fraction.
   .continuity_scores <- continuity_scores                  # R/est_clean.R
 
-  # Does the z column carry REAL axial data, or is it a placeholder?
-  # 2D MINFLUX exports routinely ship an all-zero (or constant) z column, and 0 is
-  # finite - so the obvious test `any(is.finite(df$z))` returns TRUE for 2D data and
-  # every dimension-aware estimator downstream silently switches to 3D. That pools a
-  # ZERO-VARIANCE axis into the maths: it diluted the pooled σ_loc by √(2/3) (−18%)
-  # and D_cve by 2/3 (−33%), and it would have the JDD fit a 3D Maxwell law to 2D
-  # distances. Requiring real spread is the criterion msd_unified_bundle and
-  # trk_disp_bundle already used; this makes it the single shared definition so the
-  # dimension decision cannot drift between tools again.
-  # Tracking's 3D test, kept as a named wrapper because it has many call sites.
-  # Delegates to the shared predicate so the axial-calibration panel and the
-  # 2D/3D view toggle can never disagree about whether a dataset has z.
-  .has_real_z <- function(df, min_sd = 1) {
-    has_axial_data(df, min_sd = min_sd, min_n = 11L)
-  }
 
   # ============================================================================
   # trk_cve_bundle() - LOCALIZATION PRECISION (σ_loc) + DATA-QUALITY CALIBRATION
@@ -731,7 +686,6 @@ tracking_server <- function(input, output, session) {
     else NULL
 
 
-
     # ── data quality: same integrated-fraction metric as TSA / cycle-time status ──
     fi_raw  <- b$frac_integ %||% NA_real_;      fi_filt <- b$frac_integ_filt %||% NA_real_
     c_raw   <- b$cont_raw   %||% NA_real_;      c_filt  <- b$cont_filt      %||% NA_real_
@@ -1012,22 +966,7 @@ tracking_server <- function(input, output, session) {
   loop$auto_tuning      <- FALSE  # TRUE while apply_auto_tune() is batching input updates
   loop$last_fire_layout <- TRUE   # TRUE = last trigger was fire_layout (full rebuild)
 
-  # Base animation cadence (~16 fps at 1x speed). Replaces the old "Tick interval"
-  # input: it drives the simultaneous (prebinned) loop and floors the sequential
-  # loop. The "Playback speed (×)" slider scales the per-frame delay around this.
-  TICK_INTERVAL_SEC <- 0.06
-  # Hard lower bound on per-frame delay (~50 fps). Stops the loop from outpacing
-  # the websocket (which is what made playback "refuse to stop"), no matter how
-  # high the speed multiplier or how small "ms per time unit" gets.
-  MIN_INTERVAL_SEC  <- 0.02
 
-  # Effective per-frame delay (seconds) for the current speed multiplier.
-  play_interval_for <- function(speed) {
-    s <- suppressWarnings(as.numeric(speed))
-    if (!is.finite(s) || s <= 0) s <- 1
-    max(MIN_INTERVAL_SEC, TICK_INTERVAL_SEC / s)
-  }
-  
   # ---- Optional chunk picker (manifest.csv in same folder as upload) ----
   output$trk_chunk_ui <- renderUI({
     req(trk_has_data())
@@ -1206,50 +1145,6 @@ tracking_server <- function(input, output, session) {
     if (length(v) > 1L) paste0(b, "_merged", length(v)) else b
   })
 
-  # Loader for one file → data.frame (or NULL).  Returns attr "json_itr".
-  load_one_trk <- function(p, nm) {
-    d <- NULL; jitr <- NA_integer_
-    if (grepl("\\.csv(\\.gz)?$", nm)) {
-      d <- data.table::fread(p, showProgress = FALSE, nThread = max(1, parallel::detectCores()-1)) |>
-           as.data.frame()
-      # A CSV arrives with some axial factor already applied; return z to raw so
-      # trk_raw_df() applies the user's calibration once (it was applied twice).
-      d <- strip_csv_z_calibration(d)
-      d <- canonicalize_minflux_df(d)
-    } else if (grepl("\\.(qs|fst)$", nm)) {
-      # read_chunk_file reports a missing 'qs' rather than throwing, so a machine
-      # without it degrades to "this file was skipped" instead of a stack trace.
-      d <- read_chunk_file(p)
-      if (is.null(d)) return(NULL)
-    } else if (grepl("\\.rds$", nm)) {
-      d <- readRDS(p)
-      if (!is.data.frame(d)) return(NULL)
-      d <- canonicalize_minflux_df(d)
-    } else if (grepl("\\.json$", nm)) {
-      # z_scale = 1: chunks store RAW z. The axial calibration is applied once,
-      # in trk_raw_df(), so every format lands on the same footing.
-      d <- read_minflux_json_as_df(p, keep_final_only = TRUE, keep_valid_only = TRUE,
-                                   z_scale = 1.0)
-      jitr <- if ("itr" %in% names(d) && nrow(d) > 0) max(d$itr, na.rm = TRUE) else NA_integer_
-    } else if (grepl("\\.npy$", nm)) {
-      d <- read_minflux_npy_as_df(p, keep_final_only = TRUE, keep_valid_only = TRUE,
-                                  z_scale = 1.0)
-      jitr <- if ("itr" %in% names(d) && nrow(d) > 0) max(d$itr, na.rm = TRUE) else NA_integer_
-    } else {
-      return(NULL)
-    }
-    attr(d, "json_itr") <- jitr
-    d
-  }
-
-  # Choices for the Active dataset selector: every file, plus the merged view.
-  .trk_view_choices <- function(store) {
-    nm <- names(store)
-    ch <- stats::setNames(nm, nm)
-    if (length(nm) >= 2L)
-      ch <- c(ch, stats::setNames("__merged__", sprintf("All %d loaded files, merged", length(nm))))
-    ch
-  }
 
   # ── .trk_ingest() ──────────────────────────────────────────────────────────
   # GOAL: make one data.frame the active dataset: per-track summary, frozen raw
@@ -2261,18 +2156,6 @@ tracking_server <- function(input, output, session) {
       if (is.finite(t_c)) sprintf("  ·  cycle = %.4g ms", t_c) else "")
   })
 
-  # ── TSA: MINFLUX sequence (.json) import ────────────────────────────────────
-  # Parses an Imspector imaging-sequence JSON. The acquisition cycle time is still
-  # recovered from the DATA (the robust cluster method) - the sequence is used to
-  # cross-check the scan geometry and, most usefully, to set the gap-split
-  # threshold from the hardware's own maxOffTime ("particle lost" timeout).
-  .pattern_vertices <- function(p) {
-    if (is.null(p) || is.na(p)) return(NA_integer_)
-    switch(tolower(p),
-           hexagon = 6L, square = 4L, triangle = 3L, octahedron = 6L,
-           zline = 2L, zline2 = 2L, line = 2L,
-           NA_integer_)
-  }
 
   # .crlb_doughnut() (photon-budget σ, pattern-aware) and .tcp_geom() live in est_cve.R.
 
@@ -3514,110 +3397,7 @@ tracking_server <- function(input, output, session) {
   # where the filtered dataframe is identical to the previous run.
   # frames_store() still runs on every plot_trigger; it reads isolate(trk()) and
   # gets the cached result when data_ver did not change.
-  # ── Dark-cycle colouring ─────────────────────────────────────────────────────
-  # A step spanning k = round(dt / cycle_time) acquisition cycles has k-1 DARK cycles
-  # (k=1 = integrated, i.e. a localization every cycle). Each localization inherits the
-  # dark-cycle count of the step LEADING INTO it. Colour scheme: integrated = blue,
-  # 1+ dark cycles = light→deep red gradient (capped at DARK_NMAX; higher = deeper red).
-  DARK_NMAX <- 6L
-  .dark_hex <- function(nmax = DARK_NMAX) {
-    reds <- grDevices::colorRampPalette(c("#fca9a4", "#e34a33", "#7f000d"))(nmax)
-    c("#2c7fb8", reds)                       # length nmax+1; index = n_dark + 1
-  }
-  dark_cycle_cols <- function(n_dark, nmax = DARK_NMAX) {
-    pal <- .dark_hex(nmax)
-    i <- pmin(pmax(as.integer(n_dark), 0L), nmax) + 1L
-    i[!is.finite(i)] <- 1L
-    pal[i]
-  }
-  dark_cycle_colorscale <- function(nmax = DARK_NMAX) {
-    pal <- .dark_hex(nmax)                   # colours for values 0..nmax
-    lapply(0:nmax, function(k) list(k / nmax, pal[k + 1]))
-  }
 
-  # ── Speed colouring (drift velocity) ─────────────────────────────────────────
-  # Per-step speed |Δr|/Δt is NOT usable here: Brownian motion has no instantaneous
-  # velocity, so r/Δt diverges as Δt→0 and mostly measures the sampling rate (see the
-  # header note, and why the Speed panel's path speed can't separate diffusion from
-  # transport). We therefore colour by the same COHERENT-transport measure the Speed &
-  # Transport panel uses: v_drift = |net displacement| / span over a CENTRED window W.
-  # Diffusion's net displacement grows only as sqrt(t) so its apparent v ~ sqrt(4D/W)
-  # stays low, while sustained directed motion reads high - which is what makes a
-  # confined stretch read blue and a directed excursion read red.
-  # Vectorised per track via findInterval on the window edges → O(N) overall.
-  trk_point_drift_speed <- function(df, win_ms = 200, min_pts = 3L) {
-    n_all <- nrow(df)
-    v <- rep(NA_real_, n_all)
-    if (!is.finite(win_ms) || win_ms <= 0 || n_all < 2L) return(v)
-    has_z <- "z" %in% names(df) && any(is.finite(df$z))
-    hw <- win_ms / 2
-    for (ii in split(seq_len(n_all), df$tid)) {
-      n <- length(ii); if (n < 2L) next
-      t <- df$tim[ii]; xx <- df$x[ii]; yy <- df$y[ii]
-      zz <- if (has_z) df$z[ii] else NULL
-      lo <- pmin(pmax(findInterval(t - hw, t) + 1L, 1L), n)   # first pt >= t-W/2
-      hi <- pmin(pmax(findInterval(t + hw, t),      1L), n)   # last  pt <= t+W/2
-      span <- t[hi] - t[lo]
-      dr <- sqrt((xx[hi] - xx[lo])^2 + (yy[hi] - yy[lo])^2 +
-                 (if (has_z) (zz[hi] - zz[lo])^2 else 0))
-      okw <- is.finite(span) & span > 0 & is.finite(dr) & (hi - lo + 1L) >= min_pts
-      vv <- rep(NA_real_, n); vv[okw] <- dr[okw] / span[okw]   # nm/ms = µm/s
-      v[ii] <- vv
-    }
-    v
-  }
-  # Blue (slow / confined) → red (fast / directed). NA (window can't be formed, e.g.
-  # at track ends) stays GREY rather than being painted a misleading "slow" blue.
-  .speed_hex <- function(n = 64L)
-    grDevices::colorRampPalette(c("#2c7fb8", "#41b6c4", "#fecc5c", "#fd8d3c", "#e31a1c"))(n)
-  speed_cols <- function(v, vmax) {
-    pal <- .speed_hex()
-    out <- rep("#9e9e9e", length(v))
-    ok  <- is.finite(v) & isTRUE(is.finite(vmax) && vmax > 0)
-    if (any(ok)) {
-      i <- 1L + as.integer(round(pmin(pmax(v[ok] / vmax, 0), 1) * (length(pal) - 1L)))
-      out[ok] <- pal[i]
-    }
-    out
-  }
-  speed_colorscale <- function() {
-    pal <- .speed_hex(9L)
-    lapply(seq_along(pal), function(k) list((k - 1) / (length(pal) - 1), pal[k]))
-  }
-
-  # Colorbar-only trace. Per-point colours are baked as hex strings (needed by the
-  # restyle-driven playback path), and hex arrays carry no colourbar - so we append one
-  # invisible 2-point trace whose sole job is to render the scale. Added LAST so it can
-  # never shift trail_start / markers_idx in trace_map.
-  # ax/ay/az anchor the trace on REAL coordinates: plotly (scattergl especially) drops a
-  # trace whose points are all NA, and a dropped trace draws no colourbar. The markers
-  # are made invisible with opacity 0 + size 0 instead.
-  add_colorbar_trace <- function(fig, mode, fg_col, vmax = NA_real_, use3d = FALSE,
-                                 ax = 0, ay = 0, az = 0) {
-    if (!mode %in% c("dark", "speed")) return(fig)
-    if (!is.finite(ax) || !is.finite(ay)) { ax <- 0; ay <- 0 }
-    if (!is.finite(az)) az <- 0
-    if (identical(mode, "dark")) {
-      cs <- dark_cycle_colorscale(); cmin <- 0; cmax <- DARK_NMAX
-      cb <- list(title = list(text = "dark<br>cycles", font = list(color = fg_col)),
-                 tickmode = "array", tickvals = 0:DARK_NMAX,
-                 ticktext = c(as.character(0:(DARK_NMAX - 1L)), paste0(DARK_NMAX, "+")),
-                 tickfont = list(color = fg_col), len = 0.5, thickness = 14)
-    } else {
-      if (!is.finite(vmax) || vmax <= 0) return(fig)
-      cs <- speed_colorscale(); cmin <- 0; cmax <- vmax
-      cb <- list(title = list(text = "drift speed<br>(µm/s)", font = list(color = fg_col)),
-                 tickfont = list(color = fg_col), len = 0.5, thickness = 14)
-    }
-    args <- list(x = c(ax, ax), y = c(ay, ay),
-                 type = if (use3d) "scatter3d" else "scattergl", mode = "markers",
-                 marker = list(size = 0, opacity = 0, color = c(cmin, cmax),
-                               colorscale = cs, cmin = cmin, cmax = cmax,
-                               showscale = TRUE, colorbar = cb),
-                 hoverinfo = "skip", showlegend = FALSE, name = "scale")
-    if (use3d) args$z <- c(az, az)
-    do.call(add_trace, c(list(fig), args))
-  }
 
   # ── trk() - THE analysis-ready dataset ──────────────────────────────────────
   # GOAL: the single hand-off point between the filter pipeline and everything
@@ -3705,29 +3485,6 @@ tracking_server <- function(input, output, session) {
     unique(as.character(ch$tid))
   })
 
-  # Subset a display data.frame to the chunk's TIDs.
-  #
-  # A chunk file holds one of TWO TID conventions, and the match has to accept both:
-  #   * UPLOAD chunks hold the original TIDs ("42"). Gap-splitting happens live
-  #     afterwards, so the display frame carries segments ("42_s1") that must still
-  #     be matched to their parent chunk - hence the base-TID comparison.
-  #   * RE-CHUNKED sets have the split BAKED IN (the rechunk writes "42_s1" as the
-  #     TID), so the display frame and the chunk file agree exactly and the base
-  #     comparison alone never matches - "42" is not in {"42_s1", ...}. Every row
-  #     then failed, the guard below returned the whole frame, and selecting a
-  #     chunk appeared to do nothing.
-  # Testing both forms covers each case without over-matching: a chunk holding
-  # "42_s1" still does not pull in "42_s2", which may belong to a different chunk.
-  #
-  # Falls back to the full frame if the scope would leave nothing to animate.
-  scope_playback <- function(d, chunk_tids) {
-    if (is.null(chunk_tids) || !nrow(d) || !"tid" %in% names(d)) return(d)
-    tid_d <- as.character(d$tid)
-    base  <- sub("_s\\d+$", "", tid_d, perl = TRUE)
-    keep  <- tid_d %in% chunk_tids | base %in% chunk_tids
-    if (!any(keep)) return(d)            # chunk fully filtered out - don't blank playback
-    d[keep, , drop = FALSE]
-  }
 
   # ── seq_data() - prepare tracks for PLAYBACK ────────────────────────────────
   # GOAL: turn the analysis dataset into a per-track structure the animation can
@@ -4145,11 +3902,6 @@ tracking_server <- function(input, output, session) {
     )
   }, ignoreNULL = TRUE)
   
-  fmt_num <- function(x) ifelse(is.finite(x), format(signif(x, 4), trim = TRUE), "NA")
-  hex_to_rgba <- function(hex, alpha = 0.5) {
-    rgb_vals <- grDevices::col2rgb(hex)
-    sprintf("rgba(%d,%d,%d,%.2f)", rgb_vals[1L], rgb_vals[2L], rgb_vals[3L], alpha)
-  }
   # --- show frame dt and time basis ----------------------------------------
   output$trk_frame_meta <- renderUI({
     req(!is.na(plot_trigger()))  # plot_trigger: updates after auto-tune frame rebuilds too
@@ -4909,50 +4661,6 @@ tracking_server <- function(input, output, session) {
     invisible(k)
   }
   
-  smart_defaults <- function(df, mode = c("simul","seq"), target_frames = 200, target_fps = 15) {
-    mode <- match.arg(mode)
-    tcol <- if (mode == "simul") "tim0" else "tim"
-    
-    # robust time span
-    rng <- range(df[[tcol]], na.rm = TRUE)
-    total_units <- if (mode == "simul") max(df$tim0, na.rm = TRUE) else diff(rng)
-    if (!is.finite(total_units) || total_units <= 0) total_units <- 1
-    
-    # round up to a nice number for the playback window
-    nice_total <- max(pretty(c(0, total_units), n = 5))
-    
-    # frame count / width
-    n_frames <- target_frames
-    bin_dt   <- nice_total / n_frames
-    
-    # trail ~5% of window, at least one frame wide
-    trail_len <- max(nice_total * 0.05, bin_dt)
-    
-    # marker quota ~ avg points per frame (*1.5 safety), clipped
-    n_pts <- nrow(df)
-    target_markers <- max(200, min(8000, round((n_pts / n_frames) * 1.5)))
-    
-    # sequential timing: choose ms_per_unit to get ~target_fps
-    # use median per-TID duration for stability
-    durs <- df |>
-      dplyr::group_by(tid) |>
-      dplyr::summarise(dur = max(.data[[tcol]]) - min(.data[[tcol]]), .groups = "drop") |>
-      dplyr::pull(dur)
-    med_dur <- suppressWarnings(stats::median(durs[is.finite(durs) & durs > 0]))
-    if (!is.finite(med_dur) || med_dur <= 0) med_dur <- total_units
-    step_units   <- med_dur / n_frames           # units per frame (seq)
-    frame_ms     <- 1000 / target_fps            # ~15 fps
-    ms_per_unit  <- max(1, round(frame_ms / max(step_units, .Machine$double.eps)))
-    
-    list(
-      nice_total      = nice_total,
-      n_frames        = n_frames,
-      bin_dt          = bin_dt,
-      trail_len       = trail_len,
-      target_markers  = target_markers,
-      ms_per_unit     = ms_per_unit
-    )
-  }  
   
   # Draw one step of the CURRENT TID by point index (1..nrow(tb))
   draw_tid_point <- function(tid, i) {
@@ -5005,80 +4713,6 @@ tracking_server <- function(input, output, session) {
     }
   }
   
-  
-  #--------HEATMAP-------
-  hm_colorscale <- function(name = "fire") {
-    switch(name,
-      magenta = list(
-        c(0.00, "#000000"), c(0.40, "#3b0f3f"),
-        c(0.70, "#a100a1"), c(1.00, "#ffe6ff")
-      ),
-      fire = list(
-        c(0.00, "#000000"), c(0.25, "#4d0000"),
-        c(0.50, "#b30000"), c(0.75, "#ff8c00"),
-        c(1.00, "#ffff00")
-      ),
-      # all NUMERIC_PALETTES entries fall through to plotly_colorscale
-      plotly_colorscale(name)
-    )
-  }
-  apply_heatmap_contrast <- function(zmat, clip = c(1, 99), gamma = 1) {
-    zvec <- as.numeric(zmat)
-    zvec <- zvec[is.finite(zvec)]
-    if (!length(zvec)) return(zmat)
-    
-    lo <- stats::quantile(zvec, clip[1] / 100, names = FALSE, type = 7)
-    hi <- stats::quantile(zvec, clip[2] / 100, names = FALSE, type = 7)
-    if (!is.finite(lo) || !is.finite(hi) || lo >= hi) {
-      lo <- min(zvec, na.rm = TRUE)
-      hi <- max(zvec, na.rm = TRUE) + 1e-9
-    }
-    
-    zclip <- pmin(pmax(zmat, lo), hi)
-    z01   <- (zclip - lo) / (hi - lo)
-    
-    if (is.finite(gamma) && gamma > 0 && abs(gamma - 1) > 1e-9) {
-      # gamma < 1 brightens faint values; gamma > 1 compresses lows
-      z01 <- z01 ^ gamma
-    }
-    z01
-  }
-  
-  build_dwell_heatmap <- function(df, nbins = 80) {
-    # df needs columns x, y, tid, tim
-    df <- df[is.finite(df$x) & is.finite(df$y) & is.finite(df$tim), ]
-    if (!nrow(df)) return(NULL)
-    
-    df <- df[order(df$tid, df$tim), ]
-    # dwell weight = time until next sample within same tid
-    df <- df %>%
-      group_by(tid) %>%
-      mutate(dt = lead(tim) - tim) %>%
-      ungroup()
-    df$dt[!is.finite(df$dt) | df$dt < 0] <- 0
-    
-    xr <- range(df$x, na.rm = TRUE); if (xr[1] == xr[2]) xr <- xr + c(-0.5, 0.5)
-    yr <- range(df$y, na.rm = TRUE); if (yr[1] == yr[2]) yr <- yr + c(-0.5, 0.5)
-    
-    xb <- seq(xr[1], xr[2], length.out = nbins + 1)
-    yb <- seq(yr[1], yr[2], length.out = nbins + 1)
-    ix <- findInterval(df$x, xb, all.inside = TRUE)
-    iy <- findInterval(df$y, yb, all.inside = TRUE)
-    
-    # full grid with zeros
-    df$ix <- factor(pmax(1, pmin(nbins, ix)), levels = 1:nbins)
-    df$iy <- factor(pmax(1, pmin(nbins, iy)), levels = 1:nbins)
-    
-    z <- xtabs(df$dt ~ df$iy + df$ix)     # rows=y, cols=x
-    z <- as.matrix(z)
-    
-    xcent <- 0.5 * (xb[-1] + xb[-length(xb)])
-    ycent <- 0.5 * (yb[-1] + yb[-length(yb)])
-    list(x = xcent, y = ycent, z = z)
-  }
-  auto_hm_bins <- function(npts) {
-    if (npts < 2e5) 300 else if (npts < 1e6) 200 else 120
-  }
   
   # ── heatmap_store() - dwell-time heatmap ────────────────────────────────────
   # GOAL: a 2D map of how much TIME molecules spent in each region of the field,
@@ -5295,25 +4929,6 @@ tracking_server <- function(input, output, session) {
     )
   })
 
-
-  # Per-track diffusion-sign filter (Bela's TAMSD D>0 rule). Given a per-track MSD
-  # matrix (rows = lags/bins, cols = tracks) and the lag-time vector, fit each
-  # track's MSD ~ a + b·tau by OLS over its finite points and return a logical
-  # mask of columns whose slope b > 0 (positive diffusion). Tracks with < 2 finite
-  # points are kept (cannot judge). Used to drop non-diffusing / artefact tracks
-  # before the ensemble in ALL three MSD pipelines.
-  .track_positive_D <- function(MSD_mat, tau) {
-    if (is.null(dim(MSD_mat))) MSD_mat <- matrix(MSD_mat, ncol = 1L)
-    apply(MSD_mat, 2L, function(m) {
-      ok <- is.finite(m) & is.finite(tau)
-      if (sum(ok) < 2L) return(TRUE)
-      x <- tau[ok]; y <- m[ok]
-      vx <- sum((x - mean(x))^2)
-      if (vx <= 0) return(TRUE)
-      b <- sum((x - mean(x)) * (y - mean(y))) / vx
-      is.finite(b) && b > 0
-    })
-  }
 
   #---- MSD export ----
   msd_export <- reactive({
@@ -5867,139 +5482,6 @@ tracking_server <- function(input, output, session) {
     }
   )
 
-  # MSD fit core (blur R from trk_blur(), .olsf_sig2, .michalet_p, msd_fit_olsf,
-  # msd_fit_olsf_iterative) lives in est_msd.R since 2026-09-17.
-
-  msd_fit_result <- function(tau, msd, k, anomalous = TRUE, ndim = 2L) {
-    df <- data.frame(tau = tau[seq_len(k)], msd = msd[seq_len(k)])
-    df <- df[is.finite(df$tau) & is.finite(df$msd) & df$tau > 0, ]
-    if (nrow(df) < 3L) return(NULL)
-    coef_val <- 2L * ndim   # 4 for 2D, 6 for 3D
-
-    D0     <- max(1e-6, (max(df$msd) - min(df$msd)) / (coef_val * max(df$tau)))
-    sig0   <- max(0, sqrt(abs(df$msd[1]) / coef_val))
-    alpha0 <- 1.0
-    alpha_se <- NA_real_   # parametric SE on alpha from the ensemble fit (set below)
-
-    fm_anom <- as.formula(sprintf("msd ~ %d*D*tau^alpha + %d*sig2", coef_val, coef_val))
-    fm_lin  <- as.formula(sprintf("msd ~ %d*D*tau + %d*sig2",       coef_val, coef_val))
-
-    if (anomalous) {
-      fit <- tryCatch(
-        nls(fm_anom, data = df,
-            start   = list(D = D0, alpha = alpha0, sig2 = sig0^2),
-            lower   = list(D = 0,  alpha = 0.05,   sig2 = 0),
-            upper   = list(D = Inf, alpha = 2.5,   sig2 = Inf),
-            algorithm = "port",
-            control = nls.control(maxiter = 200, warnOnly = TRUE)),
-        error = function(e) NULL
-      )
-      if (is.null(fit)) {
-        fit <- tryCatch(
-          nls(fm_lin, data = df,
-              start = list(D = D0, sig2 = sig0^2),
-              lower = list(D = 0, sig2 = 0),
-              algorithm = "port",
-              control = nls.control(maxiter = 200, warnOnly = TRUE)),
-          error = function(e) NULL
-        )
-        if (is.null(fit)) return(NULL)
-        cf <- coef(fit)
-        D_est <- unname(cf["D"]); alpha_est <- 1.0
-        sig_est <- sqrt(max(0, unname(cf["sig2"]))); forced_linear <- TRUE
-      } else {
-        cf <- coef(fit)
-        D_est <- unname(cf["D"]); alpha_est <- unname(cf["alpha"])
-        sig_est <- sqrt(max(0, unname(cf["sig2"]))); forced_linear <- FALSE
-        # Parametric SE on alpha from the fit covariance. NB this treats the averaged
-        # MSD points as independent, so it is a LOWER bound on the true uncertainty
-        # (MSD lags are correlated) - surfaced in the UI with that caveat.
-        alpha_se <- tryCatch(unname(sqrt(diag(vcov(fit)))["alpha"]), error = function(e) NA_real_)
-      }
-    } else {
-      fit <- tryCatch(
-        nls(fm_lin, data = df,
-            start = list(D = D0, sig2 = sig0^2),
-            lower = list(D = 0, sig2 = 0),
-            algorithm = "port",
-            control = nls.control(maxiter = 200, warnOnly = TRUE)),
-        error = function(e) NULL
-      )
-      if (is.null(fit)) return(NULL)
-      cf <- coef(fit)
-      D_est <- unname(cf["D"]); alpha_est <- 1.0
-      sig_est <- sqrt(max(0, unname(cf["sig2"]))); forced_linear <- FALSE
-    }
-
-    tau_seq <- seq(min(df$tau), max(df$tau), length.out = 200)
-    yfit    <- pmax(0, coef_val * D_est * tau_seq^alpha_est + coef_val * sig_est^2)
-
-    list(D = D_est, alpha = alpha_est, alpha_se = alpha_se, sigma_loc = sig_est,
-         tau_fit = tau_seq, msd_fit = yfit,
-         forced_linear = if (anomalous) forced_linear else FALSE,
-         ndim = ndim)
-  }
-
-  # Shared fit-window selector - applied consistently by the ensemble estimates,
-  # the plotted fit line, and the per-track fits so they always agree.
-  # Lower bound: min_lag_ms.  Upper bound: fit_max_ms (absolute) when > 0, else
-  # fit_pct % of the remaining points.  Returns a logical mask over `tau`.
-  msd_fit_mask <- function(tau, min_lag_ms = 0, fit_max_ms = 0, fit_pct = 30) {
-    keep <- is.finite(tau)
-    if (min_lag_ms > 0) keep <- keep & tau >= min_lag_ms
-    idx  <- which(keep)
-    if (!length(idx)) return(keep)
-    if (fit_max_ms > 0) {
-      keep <- keep & tau <= fit_max_ms
-    } else {
-      k <- max(3L, floor((fit_pct / 100) * length(idx)))
-      cutoff <- sort(tau[idx])[min(k, length(idx))]
-      keep <- keep & tau <= cutoff
-    }
-    keep
-  }
-
-  # Shared trackable-diffusion ceiling (D_max) estimate, backing the D_max panel.
-  # Above ~D_max the MINFLUX localization loop can no longer keep the doughnut centred,
-  # so D is systematically UNDER-estimated (Vogler et al. 2025; SimuFLUX, Marin & Ries 2025).
-  #
-  # WHICH L THIS IS. L_TCP is the diameter of the FINAL iteration - the one that is
-  # reiterated continuously while tracking - because that is the pattern the particle
-  # has to stay inside between consecutive fixes. The coarse search iterations that
-  # precede lock-on are irrelevant here, and so is the much tighter final iteration an
-  # IMAGING sequence would use: SPT deliberately stops at a larger L, since precision
-  # improves only linearly as L shrinks (sigma_CRLB ~ L/(4*sqrt(N))) while the escape
-  # risk grows quadratically (D_max ~ L^2). 150 nm is the tracking-iteration diameter
-  # in Vogler et al. 2025 and matches the simulator's L default (sim_server.R).
-  #
-  # Pure function of the localization table + L_TCP (nm) & hardware dead-time t_hw (ms).
-  # Returns D_max in um^2/s (Vogler form preferred, simple form fallback).
-  dmax_estimate <- function(df, L = DMAX_L_TCP_DEFAULT, t_hw = 0.05) {
-    if (is.null(df) || !nrow(df) || !all(c("tid","tim") %in% names(df))) return(NULL)
-    if (!is.finite(L)    || L    <= 0) L    <- DMAX_L_TCP_DEFAULT
-    if (!is.finite(t_hw) || t_hw <  0) t_hw <- 0.05
-    efo_med <- if ("efo" %in% names(df)) { v <- df$efo[is.finite(df$efo) & df$efo > 0]; if (length(v)) median(v) else NA_real_ } else NA_real_
-    eco_med <- if ("eco" %in% names(df)) { v <- df$eco[is.finite(df$eco) & df$eco > 0]; if (length(v)) median(v) else NA_real_ } else NA_real_
-    n_pl <- eco_med   # ECO is the photon count per localization (= N_PL directly)
-    t_loc_eco <- if (is.finite(eco_med) && is.finite(efo_med) && efo_med > 0)
-      (eco_med / efo_med) * 1000 else NA_real_   # ms to collect ECO photons at rate EFO
-    # Median within-track dt fallback (fast integer-coded, not slow character tapply).
-    tf  <- match(df$tid, unique(df$tid))
-    ord <- order(tf, df$tim, method = "radix")
-    tf2 <- tf[ord]; tim2 <- df$tim[ord]; n <- length(tf2)
-    same <- c(FALSE, tf2[-1] == tf2[-n])
-    dtd  <- c(NA_real_, diff(tim2))[same]; dtd <- dtd[is.finite(dtd) & dtd > 0]
-    t_loc_dt <- if (length(dtd)) median(dtd) else NA_real_
-    t_loc <- if (is.finite(t_loc_eco)) t_loc_eco else t_loc_dt
-    D_max_simple <- if (is.finite(t_loc) && t_loc > 0) (L^2 / (16 * t_loc)) / 1e3 else NA_real_
-    D_max_vogler <- if (is.finite(efo_med) && is.finite(n_pl) && is.finite(t_hw)) {
-      psi <- efo_med; t_hw_s <- t_hw / 1000
-      ((L^2 / 16) * psi / (n_pl + psi * t_hw_s)) / 1e6
-    } else NA_real_
-    list(efo_med = efo_med, n_pl = n_pl, t_loc_eco = t_loc_eco, t_loc_dt = t_loc_dt,
-         t_loc = t_loc, D_max_simple = D_max_simple, D_max_vogler = D_max_vogler,
-         D_max = if (is.finite(D_max_vogler)) D_max_vogler else D_max_simple)
-  }
 
   # --- Diffusion limit (D_max) panel -----------------------------------------
   output$trk_dmax_panel <- renderUI({
@@ -6410,10 +5892,6 @@ tracking_server <- function(input, output, session) {
   # the right answer rather than a fudge.
   .geom_for_null <- function(g) if (g %in% c("sphere", "rod", "ellipsoid", "membrane")) g else "free"
 
-  # Human-readable name of the shared geometry, for panels that only echo it.
-  .geom_label <- function(g) switch(g %||% "none",
-    none = "None - unbounded", sphere = "Sphere", rod = "Rod / spherocylinder",
-    ellipsoid = "Ellipsoid", membrane = "Flat membrane", filament = "Filament / linear track", g)
 
   .msd_d_eff <- function(d_obs) {
     motion <- input$trk_motion %||% "volume"
@@ -7508,25 +6986,6 @@ tracking_server <- function(input, output, session) {
     )
   })
 
-  # Cycle stats on an arbitrary df (Integrated/Dark) at a given cycle time.
-  compute_cycle_stats <- function(df, t_c) {
-    if (is.null(df) || !nrow(df) || !all(c("tid", "tim") %in% names(df)) ||
-        !is.finite(t_c) || t_c <= 0) return(NULL)
-    tf  <- match(df$tid, unique(df$tid))           # integer codes → radix sort (fast)
-    ord <- order(tf, df$tim, method = "radix")
-    tf  <- tf[ord]; tim <- df$tim[ord]; n <- length(tf)
-    same <- c(FALSE, tf[-1] == tf[-n])             # consecutive pair within same track
-    dts  <- c(NA_real_, diff(tim))[same]           # within-track gaps only
-    dts <- dts[is.finite(dts) & dts > 0]
-    if (!length(dts)) return(NULL)
-    n_cyc <- pmax(1L, as.integer(round(dts / t_c)))
-    list(n_tracks   = length(unique(tf)),
-         n_total    = length(n_cyc),
-         frac_integ = mean(n_cyc == 1L),
-         dark_total = sum(n_cyc - 1L),
-         mean_cyc   = mean(n_cyc),
-         max_cyc    = max(n_cyc))
-  }
 
   # Raw vs analyzed cycle-stats: the NET effect of all track cleaning (gap-split +
   # end-trim + quality gate + metadata + length/duration) on the Integrated/Dark
@@ -7980,8 +7439,6 @@ tracking_server <- function(input, output, session) {
   )
 
 
-
-
   # ============================================================================
   # conf_ci_bundle() - PER-TRACK CONFINEMENT FROM THE MSD SHAPE (CI + simulated null)
   # ============================================================================
@@ -8203,8 +7660,6 @@ tracking_server <- function(input, output, session) {
   })
 
 
-
-
   # ============================================================================
   # trk_disp_bundle() - NET DISPLACEMENT vs DIFFUSION  (Step 1 of the geometry test)
   # ----------------------------------------------------------------------------
@@ -8369,13 +7824,6 @@ tracking_server <- function(input, output, session) {
   # drives the null at the matching surface D → both bands agree at short T and the
   # closed-surface band diverges only where finite size + curvature bite. Same physics as
   # the Diffusion Simulator.
-  # Labels for the current geometry's size parameters (used in the summary).
-  .disp_geom_dims <- function(geom, p) switch(geom,
-    sphere    = sprintf("R = %.0f nm", p$R),
-    rod       = sprintf("r = %.0f nm, L = %.0f nm", p$r, p$Lcyl),
-    ellipsoid = sprintf("semi-axes %.0f / %.0f / %.0f nm", p$a, p$b, p$c),
-    membrane  = sprintf("tilt = %.0f°", p$mtilt),
-    free      = "unbounded", "")
   trk_disp_geom_null <- reactive({
     if (!isTRUE(input$trk_disp_geom)) return(NULL)
     res <- trk_disp_bundle(); req(nrow(res) > 0)
@@ -8457,14 +7905,6 @@ tracking_server <- function(input, output, session) {
          geom = geom, dims = .disp_geom_dims(geom, params), cyc = cyc, gmode = gmode)
   })
 
-  # Blue = sub-diffusive (confined/geometric), grey = free-consistent, red = super-
-  # diffusive (directed) - matching the Speed colouring (blue slow, red fast).
-  .disp_class_col <- function(cls) c(`sub-diffusive` = "#2c7fb8",
-                                     `free-consistent` = "#9e9e9e",
-                                     `super-diffusive` = "#e31a1c",
-                                     `confined` = "#2c7fb8",
-                                     `free-on-geometry` = "#9e9e9e",
-                                     `directed` = "#e31a1c")[cls]
 
   output$trk_disp_plot <- renderPlotly({
     req(isTRUE(input$trk_show_disp))
@@ -8929,140 +8369,6 @@ tracking_server <- function(input, output, session) {
     }
   )
 
-  # ---- Instantaneous speed (per-step v = |Δr|/Δt) -------------------------
-  # Per-track speed time-series + rolling median. nm/ms = µm/s directly.
-  trk_speed_one <- function(tb, smooth = 5L) {
-    tb <- tb[order(tb$tim), ]
-    t  <- as.numeric(tb$tim)
-    has_z <- "z" %in% names(tb) && any(is.finite(tb$z))
-    dt <- diff(t)
-    dr <- sqrt(diff(tb$x)^2 + diff(tb$y)^2 + (if (has_z) diff(tb$z)^2 else 0))
-    ok <- is.finite(dt) & dt > 0 & is.finite(dr)
-    if (!any(ok)) return(NULL)
-    spd   <- dr[ok] / dt[ok]            # nm/ms = µm/s
-    t_rel <- t[-1][ok] - t[1]           # ms relative to track start
-    k <- max(1L, as.integer(smooth)); if (k %% 2L == 0L) k <- k + 1L
-    med <- if (length(spd) >= k && k > 1L) as.numeric(stats::runmed(spd, k)) else spd
-    data.frame(t_ms = t_rel, speed_um_s = spd, speed_med = med)
-  }
-
-  # ---- Rolling drift (transport) velocity --------------------------------------
-  # v_drift(t) = |net displacement over a time window W| / W.  Unlike per-step
-  # path speed, this measures COHERENT transport: diffusion's net displacement
-  # grows only as sqrt(t), so its apparent velocity ~ sqrt(4D/W) shrinks with W,
-  # while directed transport gives a large, sustained v_drift. Windows are defined
-  # by TIME (ms), robust to MINFLUX's irregular Δt, with a min-localizations guard.
-  # nm/ms = µm/s directly. Returns midpoint-time, raw v_drift, and a light median.
-  # min_span_frac guards the track ends: near the end the forward window can no
-  # longer extend, so its DURATION collapses toward 0 while displacement noise
-  # stays - inflating v = dr/span into a spurious spike (which otherwise reads as a
-  # false "export at the very end"). Requiring the window to span >= frac·W drops
-  # those unreliable end windows. Cost: the last <frac·W of each track is not
-  # measured - you cannot estimate a velocity over near-zero time.
-  trk_drift_velocity_one <- function(tb, win_ms = 200, min_win_pts = 5L, smooth = 5L,
-                                     min_span_frac = 0.5) {
-    tb <- tb[order(tb$tim), ]
-    has_z <- "z" %in% names(tb) && any(is.finite(tb$z))
-    # Drop non-finite rows: trk() may carry NA localizations, and the net-displacement
-    # endpoints are used directly, so a single NA endpoint would poison v with NA
-    # (and crash the downstream if(has_export)). Matches the rest of the tracking code.
-    keep <- is.finite(tb$tim) & is.finite(tb$x) & is.finite(tb$y) &
-            (if (has_z) is.finite(tb$z) else TRUE)
-    tb <- tb[keep, , drop = FALSE]
-    t  <- as.numeric(tb$tim)
-    n  <- length(t)
-    min_win_pts <- max(2L, as.integer(min_win_pts))
-    if (n < min_win_pts || !is.finite(win_ms) || win_ms <= 0) return(NULL)
-    min_span <- max(0, min_span_frac) * win_ms
-    x <- tb$x; y <- tb$y; z <- if (has_z) tb$z else rep(0, n)
-    t0 <- t[1]
-    out_t <- numeric(n); out_v <- numeric(n); m <- 0L
-    j <- 1L
-    for (i in seq_len(n)) {
-      if (j < i) j <- i
-      while (j < n && t[j + 1L] <= t[i] + win_ms) j <- j + 1L   # last pt within [t_i, t_i+W]
-      span <- t[j] - t[i]; npts <- j - i + 1L
-      if (span >= min_span && span > 0 && npts >= min_win_pts) {
-        dr <- sqrt((x[j] - x[i])^2 + (y[j] - y[i])^2 + (z[j] - z[i])^2)
-        m <- m + 1L
-        out_t[m] <- (t[i] + t[j]) / 2 - t0   # centre of the window
-        out_v[m] <- dr / span                # nm/ms = µm/s
-      }
-    }
-    if (m < 1L) return(NULL)
-    out_t <- out_t[seq_len(m)]; out_v <- out_v[seq_len(m)]
-    k <- max(1L, as.integer(smooth)); if (k %% 2L == 0L) k <- k + 1L
-    vmed <- if (length(out_v) >= k && k > 1L) as.numeric(stats::runmed(out_v, k)) else out_v
-    data.frame(t_ms = out_t, v_drift = out_v, v_drift_med = vmed)
-  }
-
-  # ---- Local anomalous exponent α(t) -------------------------------------------
-  # Rolling log-log slope of a short-window MSD: α≈1 Brownian, α→2 ballistic/
-  # directed. This is the per-track analog of the ensemble TAMSD "shooting upward".
-  # Windowed by STEP COUNT (needs contiguous lag structure), but the log-log fit uses
-  # the REAL mean elapsed time per step-lag (τ = mean Δt over that lag), NOT the step
-  # index - so MINFLUX's irregular Δt / dark cycles don't bias α (a window straddling a
-  # dark gap would otherwise stretch a "1-step" lag over many cycles and flatten the
-  # slope). Assigned at the window-centre time. Returns NULL if a track is too short.
-  # sigma_nm > 0 subtracts the static localization-noise offset (2·d·σ²) from each
-  # MSD lag before the log-log fit. Without it, noise flattens the short-lag MSD and
-  # biases α downward (directed motion can read as α≈1 instead of ≈2).
-  trk_local_alpha_one <- function(tb, win_steps = 21L, max_lag = 6L, sigma_nm = 0) {
-    tb <- tb[order(tb$tim), ]
-    has_z <- "z" %in% names(tb) && any(is.finite(tb$z))
-    keep <- is.finite(tb$tim) & is.finite(tb$x) & is.finite(tb$y) &
-            (if (has_z) is.finite(tb$z) else TRUE)
-    tb <- tb[keep, , drop = FALSE]
-    n  <- nrow(tb)
-    win_steps <- max(7L, as.integer(win_steps)); if (win_steps %% 2L == 0L) win_steps <- win_steps + 1L
-    if (n < win_steps) return(NULL)
-    x <- tb$x; y <- tb$y; z <- if (has_z) tb$z else rep(0, n)
-    t <- as.numeric(tb$tim); t0 <- t[1]
-    d_dim     <- if (has_z) 3 else 2
-    noise_off <- if (is.finite(sigma_nm) && sigma_nm > 0) 2 * d_dim * sigma_nm^2 else 0
-    half <- win_steps %/% 2L
-    L    <- max(2L, min(as.integer(max_lag), win_steps %/% 3L))
-    centres <- (half + 1L):(n - half)
-    out_t <- numeric(length(centres)); out_a <- rep(NA_real_, length(centres)); li <- 0L
-    lags  <- seq_len(L)
-    for (cc in centres) {
-      idx <- (cc - half):(cc + half)
-      xi <- x[idx]; yi <- y[idx]; zi <- z[idx]; ti <- t[idx]; mlen <- length(idx)
-      msd <- rep(NA_real_, L); tau <- rep(NA_real_, L)   # MSD and REAL mean time-lag per step-lag
-      for (lg in lags) {
-        if (lg >= mlen) next
-        dx  <- xi[(lg + 1L):mlen] - xi[1:(mlen - lg)]
-        dy  <- yi[(lg + 1L):mlen] - yi[1:(mlen - lg)]
-        dz  <- zi[(lg + 1L):mlen] - zi[1:(mlen - lg)]
-        dtt <- ti[(lg + 1L):mlen] - ti[1:(mlen - lg)]    # actual elapsed time of each lag-lg pair
-        v   <- mean(dx^2 + dy^2 + dz^2) - noise_off
-        tt  <- mean(dtt[is.finite(dtt) & dtt > 0])       # mean real time spanned at this step-lag
-        if (is.finite(v) && v > 0 && is.finite(tt) && tt > 0) { msd[lg] <- v; tau[lg] <- tt }
-      }
-      okl <- is.finite(msd) & is.finite(tau)
-      li <- li + 1L
-      out_t[li] <- t[cc] - t0
-      if (sum(okl) >= 2L) {   # slope of log(MSD) vs log(REAL τ) = time-based α
-        fit <- suppressWarnings(stats::lm.fit(cbind(1, log(tau[okl])), log(msd[okl])))
-        out_a[li] <- unname(fit$coefficients[2])
-      }
-    }
-    ok <- is.finite(out_a)
-    if (!any(ok)) return(NULL)
-    data.frame(t_ms = out_t[ok], alpha = out_a[ok])
-  }
-
-  # Effective threshold for calling a drift-velocity window "directed":
-  #   absolute onset_thr if the user set one, else fold × the track's own diffusive
-  #   baseline (median drift velocity ~ sqrt(4D/W)), always floored at the
-  #   localization-noise floor √2σ/W. Fold-over-baseline (not median+k·MAD of the
-  #   signal) is what keeps pure-diffusion tracks from being flagged: validated on
-  #   synthetic data, fold≈3 gives ~5% false positives with full sensitivity.
-  trk_export_thr <- function(v, onset_thr, fold, vfloor) {
-    base <- stats::median(v, na.rm = TRUE)
-    thr  <- if (is.finite(onset_thr) && onset_thr > 0) onset_thr else fold * base
-    max(thr, vfloor, na.rm = TRUE)
-  }
 
   # Effective σ_loc for the speed/transport noise floor: the user's field if set
   # (> 0), else the app-wide value (unified MSD / manual), else 0. Keeps the drift
@@ -11354,22 +10660,6 @@ tracking_server <- function(input, output, session) {
     tb
   })
 
-  # One value typed for its column, or NULL when it does not fit (the caller then
-  # leaves the table unchanged and says so).
-  # An empty value clears a setting back to blank (= Acquisition Parameters).
-  .cmp_coerce <- function(col, val) {
-    if (is.null(val) || (length(val) == 1L && is.na(val))) val <- ""
-    if (col %in% c("L_nm", "a", "D_w")) {
-      if (!nzchar(trimws(as.character(val)))) return(NA_real_)
-      v <- suppressWarnings(as.numeric(val))
-      if (!length(v) || !is.finite(v) || v < 0 || (col != "D_w" && v == 0)) return(NULL)
-      v
-    } else if (col == "pattern") {
-      v <- .tcp_pattern_name(val)                      # names, short forms, or 3 / 4 / 6
-      if (is.na(v)) return(NULL)
-      v
-    } else trimws(as.character(val))
-  }
 
   output$trk_cmp_table <- DT::renderDT({
     tb <- cmp_tab(); req(!is.null(tb))
