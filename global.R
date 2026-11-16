@@ -67,6 +67,9 @@ if (dir.exists("plugins")) {
 }
 
 source("ui.R")
+# The three server functions are assembled from ordered part files under server/
+# (see server/parts.R and server/README.md).
+source("server/parts.R")
 source("server_smlm.R")
 source("server_tracking.R")
 source("sim_server.R")
