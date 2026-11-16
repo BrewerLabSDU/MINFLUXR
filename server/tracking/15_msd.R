@@ -1094,7 +1094,7 @@ observeEvent(msd_unified_bundle(), {
   fr <- tryCatch(msd_unified_fit(ub), error = function(e) NULL)
   if (!is.null(fr) && is.finite(fr$sigma_loc) && fr$sigma_loc > 0)
     trk_sigma_loc_rv(fr$sigma_loc)
-}, ignoreInit = TRUE)
+})   # no ignoreInit: it would skip the first Plot MSD (see the CVE observer, 02_data_quality_cve.R)
 
 output$trk_sigma_loc_status <- renderUI({
   eff <- trk_sigma_loc_eff()

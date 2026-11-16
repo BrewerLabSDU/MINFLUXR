@@ -334,7 +334,11 @@ observeEvent(trk_cve_bundle(), {
   if (is.finite(b$sig_phot_med) && b$sig_phot_med > 0) trk_sigma_loc_photon(b$sig_phot_med)
   val <- if (is.finite(b$sigma) && b$sigma > 0 && !isTRUE(b$degenerate)) b$sigma else NA_real_
   if (is.finite(val)) trk_sigma_loc_cve(val)
-}, ignoreInit = TRUE)
+})
+# No ignoreInit here. Before the first press trk_cve_bundle() stops with req(),
+# which does not count as the observer's initial run, so ignoreInit = TRUE
+# swallowed the first SUCCESSFUL run instead: sigma was only published from the
+# second press on, and the panels that subtract it ran without a noise floor.
 
 # GOAL: report the CVE calibration as numbers plus short verdicts.
 # The reasoning that used to be printed here on every run (why photons are not

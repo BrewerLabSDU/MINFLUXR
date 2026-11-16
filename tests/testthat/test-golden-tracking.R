@@ -26,11 +26,11 @@ test_that("Tracking tab: every analysis panel reproduces its golden numbers", {
     press(trk_cve_run = 1)
     res$cve         <- .grab(trk_cve_bundle())
     session$flushReact()
-    # As the code stands, the FIRST run does not publish sigma (the observer that
-    # does it has ignoreInit = TRUE; see docs/architecture_review.md, B4). Both
-    # states are pinned, and the second press is what lets the panels below
-    # exercise their noise subtraction.
+    # The FIRST run must publish sigma: the panels below subtract it, and a user
+    # presses the button once (fixed 2026-11; before, only the second press did).
     res$sigma_loc_first_run <- .grab(list(eff = trk_sigma_loc_eff(), src = trk_sigma_loc_src()))
+    expect_true(is.finite(trk_sigma_loc_eff()))
+    expect_identical(trk_sigma_loc_src(), "photon budget")
     press(trk_cve_run = 2)
     res$sigma_loc   <- .grab(list(eff = trk_sigma_loc_eff(), src = trk_sigma_loc_src()))
     press(trk_show_msd = TRUE, trk_msd_unified = TRUE, trk_uni_bootstrap = TRUE, trk_msd_cluster = TRUE)
