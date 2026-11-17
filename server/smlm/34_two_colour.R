@@ -240,67 +240,69 @@ ripley12_results     <- reactiveVal(NULL)
 ripley12_env_results <- reactiveVal(NULL)  # Monte-Carlo CSR envelope (per dataset)
 
 observeEvent(input$run_ripley12, {
-  run_set <- smlm_settings_from_input(input)   # one settings snapshot for this run
-  store <- smlm_file_store()
-  if (!length(store)) { showNotification("No datasets loaded.", type = "warning"); return() }
+  with_analysis_seed(input$smlm_seed %||% SMLM_DEFAULTS$smlm_seed, {   # reproducible random draws (R/trk_settings.R)
+    run_set <- smlm_settings_from_input(input)   # one settings snapshot for this run
+    store <- smlm_file_store()
+    if (!length(store)) { showNotification("No datasets loaded.", type = "warning"); return() }
 
-  unit      <- input$ripley12_unit %||% "tid"
-  use_3d    <- isTRUE(input$ripley12_use_3d)
-  r_max_raw <- as.numeric(input$ripley12_r_max %||% 0)
-  r_steps   <- as.integer(input$ripley12_r_steps %||% 60L)
-  want_env  <- isTRUE(input$ripley12_envelope)
-  nsim      <- max(19L, min(199L, as.integer(input$ripley12_nsim %||% 99L)))
-  env_file_cap <- 6L
-  needs_cluster <- unit == "cluster"
+    unit      <- input$ripley12_unit %||% "tid"
+    use_3d    <- isTRUE(input$ripley12_use_3d)
+    r_max_raw <- as.numeric(input$ripley12_r_max %||% 0)
+    r_steps   <- as.integer(input$ripley12_r_steps %||% 60L)
+    want_env  <- isTRUE(input$ripley12_envelope)
+    nsim      <- max(19L, min(199L, as.integer(input$ripley12_nsim %||% 99L)))
+    env_file_cap <- 6L
+    needs_cluster <- unit == "cluster"
 
-  # Prep every file FIRST, so one gap-fill radius can be resolved for the whole
-  # set before any curve is computed (see spatial_resolve_close()).
-  prepped <- Filter(Negate(is.null), lapply(seq_along(store), function(i) {
-    nm <- names(store)[i]
-    df <- prep_tc_df(store[[nm]], run_set, needs_cluster)
-    if (is.null(df)) return(NULL)
-    list(df = df, tag = nm)
-  }))
-  if (!length(prepped)) {
-    showNotification("No file has both channels after filtering.", type = "warning"); return()
-  }
-  cc <- spatial_gate_close(prepped, use_3d)
-  common_close <- cc$close_nm
-
-  results  <- list()
-  env_list <- list()
-  withProgress(message = "Bivariate Ripley L12...", value = 0, {
-    for (i in seq_along(prepped)) {
-      incProgress(1 / length(prepped))
-      nm <- prepped[[i]]$tag
-      df <- prepped[[i]]$df
-
-      r_seq <- if (r_max_raw > 0) seq(0, r_max_raw, length.out = r_steps) else NULL
-      pts1 <- get_tc_pts(df, 1L, unit); pts2 <- get_tc_pts(df, 2L, unit)
-      if (!nrow(pts1) || !nrow(pts2)) next
-      sup <- spatial_support_of(df, use_3d, tag = nm, close_nm = common_close)
-      out <- cross_curve_for_points(pts1, pts2,
-                                    estimator = "L12", r_seq = r_seq, use_3d = use_3d,
-                                    support = sup,
-                                    edge_correct = isTRUE(input$spatial_edge_correct),
-                                    envelope = want_env && length(env_list) < env_file_cap,
-                                    nsim = nsim, null_mode = input$coloc_null_mode %||% "shift",
-                                    tag = nm)
-      if (is.null(out)) next
-      results[[nm]] <- out$curve
-      if (!is.null(out$env)) env_list[[nm]] <- out$env
+    # Prep every file FIRST, so one gap-fill radius can be resolved for the whole
+    # set before any curve is computed (see spatial_resolve_close()).
+    prepped <- Filter(Negate(is.null), lapply(seq_along(store), function(i) {
+      nm <- names(store)[i]
+      df <- prep_tc_df(store[[nm]], run_set, needs_cluster)
+      if (is.null(df)) return(NULL)
+      list(df = df, tag = nm)
+    }))
+    if (!length(prepped)) {
+      showNotification("No file has both channels after filtering.", type = "warning"); return()
     }
-  })
+    cc <- spatial_gate_close(prepped, use_3d)
+    common_close <- cc$close_nm
 
-  if (!length(results)) {
-    showNotification("No results. Ensure both channels are present.", type = "warning")
-    ripley12_results(NULL)
-    ripley12_env_results(NULL)
-    return()
-  }
-  ripley12_results(do.call(rbind, results))
-  ripley12_env_results(if (length(env_list)) do.call(rbind, env_list) else NULL)
-  spatial_report_windows(vapply(prepped, function(it) as.character(it$tag), character(1)))
+    results  <- list()
+    env_list <- list()
+    withProgress(message = "Bivariate Ripley L12...", value = 0, {
+      for (i in seq_along(prepped)) {
+        incProgress(1 / length(prepped))
+        nm <- prepped[[i]]$tag
+        df <- prepped[[i]]$df
+
+        r_seq <- if (r_max_raw > 0) seq(0, r_max_raw, length.out = r_steps) else NULL
+        pts1 <- get_tc_pts(df, 1L, unit); pts2 <- get_tc_pts(df, 2L, unit)
+        if (!nrow(pts1) || !nrow(pts2)) next
+        sup <- spatial_support_of(df, use_3d, tag = nm, close_nm = common_close)
+        out <- cross_curve_for_points(pts1, pts2,
+                                      estimator = "L12", r_seq = r_seq, use_3d = use_3d,
+                                      support = sup,
+                                      edge_correct = isTRUE(input$spatial_edge_correct),
+                                      envelope = want_env && length(env_list) < env_file_cap,
+                                      nsim = nsim, null_mode = input$coloc_null_mode %||% "shift",
+                                      tag = nm)
+        if (is.null(out)) next
+        results[[nm]] <- out$curve
+        if (!is.null(out$env)) env_list[[nm]] <- out$env
+      }
+    })
+
+    if (!length(results)) {
+      showNotification("No results. Ensure both channels are present.", type = "warning")
+      ripley12_results(NULL)
+      ripley12_env_results(NULL)
+      return()
+    }
+    ripley12_results(do.call(rbind, results))
+    ripley12_env_results(if (length(env_list)) do.call(rbind, env_list) else NULL)
+    spatial_report_windows(vapply(prepped, function(it) as.character(it$tag), character(1)))
+  })
 })
 
 build_ripley12_plot_fig <- function() {
@@ -410,63 +412,65 @@ pcf12_results     <- reactiveVal(NULL)
 pcf12_env_results <- reactiveVal(NULL)  # Monte-Carlo CSR envelope (per dataset)
 
 observeEvent(input$run_pcf12, {
-  run_set <- smlm_settings_from_input(input)   # one settings snapshot for this run
-  store <- smlm_file_store()
-  if (!length(store)) { showNotification("No datasets loaded.", type = "warning"); return() }
+  with_analysis_seed(input$smlm_seed %||% SMLM_DEFAULTS$smlm_seed, {   # reproducible random draws (R/trk_settings.R)
+    run_set <- smlm_settings_from_input(input)   # one settings snapshot for this run
+    store <- smlm_file_store()
+    if (!length(store)) { showNotification("No datasets loaded.", type = "warning"); return() }
 
-  unit          <- input$pcf12_unit %||% "tid"
-  use_3d        <- isTRUE(input$pcf12_use_3d)
-  r_max_raw     <- as.numeric(input$pcf12_r_max %||% 0)
-  r_steps       <- as.integer(input$pcf12_r_steps %||% 60L)
-  want_env      <- isTRUE(input$pcf12_envelope)
-  nsim          <- max(19L, min(199L, as.integer(input$pcf12_nsim %||% 99L)))
-  env_file_cap  <- 6L
-  needs_cluster <- unit == "cluster"
+    unit          <- input$pcf12_unit %||% "tid"
+    use_3d        <- isTRUE(input$pcf12_use_3d)
+    r_max_raw     <- as.numeric(input$pcf12_r_max %||% 0)
+    r_steps       <- as.integer(input$pcf12_r_steps %||% 60L)
+    want_env      <- isTRUE(input$pcf12_envelope)
+    nsim          <- max(19L, min(199L, as.integer(input$pcf12_nsim %||% 99L)))
+    env_file_cap  <- 6L
+    needs_cluster <- unit == "cluster"
 
-  # Prep first so one gap-fill radius covers the whole set (spatial_resolve_close()).
-  prepped <- Filter(Negate(is.null), lapply(seq_along(store), function(i) {
-    nm <- names(store)[i]
-    df <- prep_tc_df(store[[nm]], run_set, needs_cluster)
-    if (is.null(df)) return(NULL)
-    list(df = df, tag = nm)
-  }))
-  if (!length(prepped)) {
-    showNotification("No file usable after filtering.", type = "warning"); return()
-  }
-  cc <- spatial_gate_close(prepped, use_3d)
-  common_close <- cc$close_nm
-
-  results  <- list()
-  env_list <- list()
-  withProgress(message = "Pair cross-correlation g₁₂...", value = 0, {
-    for (i in seq_along(prepped)) {
-      incProgress(1 / length(prepped))
-      nm <- prepped[[i]]$tag
-      df <- prepped[[i]]$df
-      r_seq <- if (r_max_raw > 0) seq(0, r_max_raw, length.out = r_steps) else NULL
-      pts1 <- get_tc_pts(df, 1L, unit); pts2 <- get_tc_pts(df, 2L, unit)
-      if (!nrow(pts1) || !nrow(pts2)) next
-      sup   <- spatial_support_of(df, use_3d, tag = nm, close_nm = common_close)
-      out <- cross_curve_for_points(pts1, pts2,
-                                    estimator = "g12", r_seq = r_seq, use_3d = use_3d,
-                                    support = sup,
-                                    edge_correct = isTRUE(input$spatial_edge_correct),
-                                    envelope = want_env && length(env_list) < env_file_cap,
-                                    nsim = nsim, null_mode = input$coloc_null_mode %||% "shift",
-                                    tag = nm)
-      if (is.null(out)) next
-      results[[nm]] <- out$curve
-      if (!is.null(out$env)) env_list[[nm]] <- out$env
+    # Prep first so one gap-fill radius covers the whole set (spatial_resolve_close()).
+    prepped <- Filter(Negate(is.null), lapply(seq_along(store), function(i) {
+      nm <- names(store)[i]
+      df <- prep_tc_df(store[[nm]], run_set, needs_cluster)
+      if (is.null(df)) return(NULL)
+      list(df = df, tag = nm)
+    }))
+    if (!length(prepped)) {
+      showNotification("No file usable after filtering.", type = "warning"); return()
     }
-  })
+    cc <- spatial_gate_close(prepped, use_3d)
+    common_close <- cc$close_nm
 
-  if (!length(results)) {
-    showNotification("No results. Check that both channels are present.", type = "warning")
-    pcf12_results(NULL); pcf12_env_results(NULL); return()
-  }
-  pcf12_results(do.call(rbind, results))
-  pcf12_env_results(if (length(env_list)) do.call(rbind, env_list) else NULL)
-  spatial_report_windows(vapply(prepped, function(it) as.character(it$tag), character(1)))
+    results  <- list()
+    env_list <- list()
+    withProgress(message = "Pair cross-correlation g₁₂...", value = 0, {
+      for (i in seq_along(prepped)) {
+        incProgress(1 / length(prepped))
+        nm <- prepped[[i]]$tag
+        df <- prepped[[i]]$df
+        r_seq <- if (r_max_raw > 0) seq(0, r_max_raw, length.out = r_steps) else NULL
+        pts1 <- get_tc_pts(df, 1L, unit); pts2 <- get_tc_pts(df, 2L, unit)
+        if (!nrow(pts1) || !nrow(pts2)) next
+        sup   <- spatial_support_of(df, use_3d, tag = nm, close_nm = common_close)
+        out <- cross_curve_for_points(pts1, pts2,
+                                      estimator = "g12", r_seq = r_seq, use_3d = use_3d,
+                                      support = sup,
+                                      edge_correct = isTRUE(input$spatial_edge_correct),
+                                      envelope = want_env && length(env_list) < env_file_cap,
+                                      nsim = nsim, null_mode = input$coloc_null_mode %||% "shift",
+                                      tag = nm)
+        if (is.null(out)) next
+        results[[nm]] <- out$curve
+        if (!is.null(out$env)) env_list[[nm]] <- out$env
+      }
+    })
+
+    if (!length(results)) {
+      showNotification("No results. Check that both channels are present.", type = "warning")
+      pcf12_results(NULL); pcf12_env_results(NULL); return()
+    }
+    pcf12_results(do.call(rbind, results))
+    pcf12_env_results(if (length(env_list)) do.call(rbind, env_list) else NULL)
+    spatial_report_windows(vapply(prepped, function(it) as.character(it$tag), character(1)))
+  })
 })
 
 build_pcf12_plot_fig <- function() {
@@ -551,75 +555,77 @@ output$kde_plane_ui <- renderUI({
 })
 
 observeEvent(input$run_kde_coloc, {
-  nm <- input$active_file %||% ""
-  if (!nzchar(nm)) { showNotification("No active file selected.", type = "warning"); return() }
-  store <- smlm_file_store()
-  raw   <- store[[nm]]
-  if (is.null(raw) || !nrow(raw)) { showNotification("Active file has no data.", type = "warning"); return() }
+  with_analysis_seed(input$smlm_seed %||% SMLM_DEFAULTS$smlm_seed, {   # reproducible random draws (R/trk_settings.R)
+    nm <- input$active_file %||% ""
+    if (!nzchar(nm)) { showNotification("No active file selected.", type = "warning"); return() }
+    store <- smlm_file_store()
+    raw   <- store[[nm]]
+    if (is.null(raw) || !nrow(raw)) { showNotification("Active file has no data.", type = "warning"); return() }
 
-  unit          <- input$kde_unit %||% "tid"
-  bw_raw        <- as.numeric(input$kde_bandwidth %||% 0)
-  n_grid        <- as.integer(input$kde_n_grid %||% 100L)
-  do_sweep      <- isTRUE(input$kde_bw_sweep)
-  costes_n      <- max(0L, as.integer(input$kde_costes_nsim %||% 0L))
-  needs_cluster <- unit == "cluster"
+    unit          <- input$kde_unit %||% "tid"
+    bw_raw        <- as.numeric(input$kde_bandwidth %||% 0)
+    n_grid        <- as.integer(input$kde_n_grid %||% 100L)
+    do_sweep      <- isTRUE(input$kde_bw_sweep)
+    costes_n      <- max(0L, as.integer(input$kde_costes_nsim %||% 0L))
+    needs_cluster <- unit == "cluster"
 
-  df <- prep_tc_df(raw, smlm_settings_from_input(input), needs_cluster)
-  if (is.null(df)) {
-    showNotification("Could not assign two-color groups. Check 2-color settings.", type = "warning")
-    kde_coloc_results(NULL); return()
-  }
+    df <- prep_tc_df(raw, smlm_settings_from_input(input), needs_cluster)
+    if (is.null(df)) {
+      showNotification("Could not assign two-color groups. Check 2-color settings.", type = "warning")
+      kde_coloc_results(NULL); return()
+    }
 
-  pts1 <- get_tc_pts(df, 1L, unit)
-  pts2 <- get_tc_pts(df, 2L, unit)
-  if (!nrow(pts1) || !nrow(pts2)) {
-    showNotification("One or both channels empty after filtering.", type = "warning")
-    kde_coloc_results(NULL); return()
-  }
+    pts1 <- get_tc_pts(df, 1L, unit)
+    pts2 <- get_tc_pts(df, 2L, unit)
+    if (!nrow(pts1) || !nrow(pts2)) {
+      showNotification("One or both channels empty after filtering.", type = "warning")
+      kde_coloc_results(NULL); return()
+    }
 
-  plane <- input$kde_plane %||% "xy"
-  ax <- switch(plane,
-    xz = c("x", "z"), yz = c("y", "z"), c("x", "y"))
-  has_ax <- function(pts) all(ax %in% names(pts)) &&
-    any(is.finite(pts[[ax[1]]])) && any(is.finite(pts[[ax[2]]]))
-  if (!has_ax(pts1) || !has_ax(pts2)) {
-    showNotification("Selected projection plane requires z coordinates which are absent.", type = "warning")
-    kde_coloc_results(NULL); return()
-  }
+    plane <- input$kde_plane %||% "xy"
+    ax <- switch(plane,
+      xz = c("x", "z"), yz = c("y", "z"), c("x", "y"))
+    has_ax <- function(pts) all(ax %in% names(pts)) &&
+      any(is.finite(pts[[ax[1]]])) && any(is.finite(pts[[ax[2]]]))
+    if (!has_ax(pts1) || !has_ax(pts2)) {
+      showNotification("Selected projection plane requires z coordinates which are absent.", type = "warning")
+      kde_coloc_results(NULL); return()
+    }
 
-  bw  <- if (bw_raw > 0) bw_raw else NULL
+    bw  <- if (bw_raw > 0) bw_raw else NULL
 
-  # Bandwidth sweep grid: log-spaced fractions of the field span (0.4%–20%),
-  # so the bandwidth-dependence of Pearson r is visible.
-  bw_sweep <- NULL
-  if (do_sweep) {
-    a1 <- c(pts1[[ax[1]]], pts2[[ax[1]]]); a2 <- c(pts1[[ax[2]]], pts2[[ax[2]]])
-    span <- min(diff(range(a1, na.rm = TRUE)), diff(range(a2, na.rm = TRUE)))
-    if (is.finite(span) && span > 0)
-      bw_sweep <- span * exp(seq(log(0.004), log(0.2), length.out = 12))
-  }
+    # Bandwidth sweep grid: log-spaced fractions of the field span (0.4%–20%),
+    # so the bandwidth-dependence of Pearson r is visible.
+    bw_sweep <- NULL
+    if (do_sweep) {
+      a1 <- c(pts1[[ax[1]]], pts2[[ax[1]]]); a2 <- c(pts1[[ax[2]]], pts2[[ax[2]]])
+      span <- min(diff(range(a1, na.rm = TRUE)), diff(range(a2, na.rm = TRUE)))
+      if (is.finite(span) && span > 0)
+        bw_sweep <- span * exp(seq(log(0.004), log(0.2), length.out = 12))
+    }
 
-  # Single-file panel (active file only), so there is no set to share a gap-fill
-  # radius with and the per-file plateau is the right choice here.
-  kde_sup <- spatial_support_of(df, FALSE)
-  res <- withProgress(message = "KDE co-localization...", value = 0.3,
-    compute_kde_coloc(pts1[[ax[1]]], pts1[[ax[2]]],
-                      pts2[[ax[1]]], pts2[[ax[2]]], bw, n_grid,
-                      bw_sweep = bw_sweep, costes_nsim = costes_n,
-                      null_mode = input$kde_null_mode %||% "shift",
-                      support = kde_sup))
-  if (is.null(res)) {
-    showNotification("KDE computation failed.", type = "warning")
-    kde_coloc_results(NULL); return()
-  }
-  res$dataset <- nm
-  res$ax      <- ax
-  # Whether the randomisation ran inside the sample footprint. With edge correction
-  # on and the footprint switch off, the window passed in is still the bounding
-  # box, so the switch (and an accepted footprint) is what decides the reading.
-  res$footprint_null <- isTRUE(input$spatial_use_support) && !is.null(kde_sup) &&
-                        !isTRUE(kde_sup$rejected_footprint)
-  kde_coloc_results(res)
+    # Single-file panel (active file only), so there is no set to share a gap-fill
+    # radius with and the per-file plateau is the right choice here.
+    kde_sup <- spatial_support_of(df, FALSE)
+    res <- withProgress(message = "KDE co-localization...", value = 0.3,
+      compute_kde_coloc(pts1[[ax[1]]], pts1[[ax[2]]],
+                        pts2[[ax[1]]], pts2[[ax[2]]], bw, n_grid,
+                        bw_sweep = bw_sweep, costes_nsim = costes_n,
+                        null_mode = input$kde_null_mode %||% "shift",
+                        support = kde_sup))
+    if (is.null(res)) {
+      showNotification("KDE computation failed.", type = "warning")
+      kde_coloc_results(NULL); return()
+    }
+    res$dataset <- nm
+    res$ax      <- ax
+    # Whether the randomisation ran inside the sample footprint. With edge correction
+    # on and the footprint switch off, the window passed in is still the bounding
+    # box, so the switch (and an accepted footprint) is what decides the reading.
+    res$footprint_null <- isTRUE(input$spatial_use_support) && !is.null(kde_sup) &&
+                          !isTRUE(kde_sup$rejected_footprint)
+    kde_coloc_results(res)
+  })
 })
 
 build_kde_coloc_plot_fig <- function() {

@@ -1417,7 +1417,12 @@ smlm_ui <- fluidPage(
                   "would erase the clustering it is meant to measure, so if the footprint comes out ",
                   "in disconnected pieces the bounding box is used instead and you are told."),
                 " The support map below shows the region in use."),
-              uiOutput("spatial_window_readout"))
+              uiOutput("spatial_window_readout"),
+              numericInput("smlm_seed", "Random seed for the analyses",
+                           value = SMLM_DEFAULTS$smlm_seed, min = 0, step = 1),
+              helpText(style = "font-size:0.8em; color:#666; margin-top:-6px;",
+                "Envelopes, simulated nulls and the hotspot calibration start from this seed on every ",
+                "Run, so a result can be reproduced from the settings file. Blank draws a new seed each Run."))
           )),
 
           # -- Labelling-density normalizsation (opt-in) ---------------------------

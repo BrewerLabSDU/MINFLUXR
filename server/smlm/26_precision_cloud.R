@@ -31,36 +31,38 @@
 # so this scatter is not a spot width and does not scale like one.
 prec_cloud_results <- reactiveVal(NULL)
 observeEvent(input$run_prec_cloud, {
-  run_set <- smlm_settings_from_input(input)   # one settings snapshot for this run
-  store <- smlm_file_store()
-  if (!length(store)) { showNotification("No files loaded.", type = "warning"); return() }
-  # Precision is ALWAYS assessed on the single ACTIVE dataset - never pooled across
-  # files (an aggregate σ would blur per-acquisition precision). Restrict to it here.
-  af <- input$active_file
-  if (is.null(af) || !af %in% names(store)) af <- names(store)[[1]]
-  store <- store[af]
-  min_loc <- max(3L, as.integer(input$prec_cloud_min_loc %||% 5L))
-  use_z   <- isTRUE(input$prec_cloud_use_z)
-  # Filtered on the SAME localizations the Display tab plots (metadata, trace
-  # length and spread filters, fiducial exclusion). If filtering fails the cloud
-  # falls back to the unfiltered file, while the drift estimate skips it.
-  filt <- lapply(names(store), function(fname)
-    tryCatch(batch_filters(qc_exclude_from(store[[fname]], fname), run_set),
-             error = function(e) NULL))
-  names(filt) <- names(store)
-  dfs <- lapply(names(store), function(fname) filt[[fname]] %||% store[[fname]])
-  names(dfs) <- names(store)
-  res <- withProgress(message = "Computing precision cloud...", value = 0,
-    precision_cloud(dfs, min_loc = min_loc, use_z = use_z, drift_dfs = filt,
-                    progress = function(frac, detail) incProgress(frac, detail = detail)))
-  if (is.null(res)) {
-    showNotification("No traces with enough localizations (lower 'Min localizations / trace').",
-                     type = "warning"); prec_cloud_results(NULL); return()
-  }
-  prec_cloud_results(res)
-  showNotification(sprintf("Precision cloud: %s localizations; σ_xy = %.2f nm.",
-                           format(res$n_locs, big.mark = ","), res$sigma_xy),
-                   type = "message", duration = 4)
+  with_analysis_seed(input$smlm_seed %||% SMLM_DEFAULTS$smlm_seed, {   # reproducible random draws (R/trk_settings.R)
+    run_set <- smlm_settings_from_input(input)   # one settings snapshot for this run
+    store <- smlm_file_store()
+    if (!length(store)) { showNotification("No files loaded.", type = "warning"); return() }
+    # Precision is ALWAYS assessed on the single ACTIVE dataset - never pooled across
+    # files (an aggregate σ would blur per-acquisition precision). Restrict to it here.
+    af <- input$active_file
+    if (is.null(af) || !af %in% names(store)) af <- names(store)[[1]]
+    store <- store[af]
+    min_loc <- max(3L, as.integer(input$prec_cloud_min_loc %||% 5L))
+    use_z   <- isTRUE(input$prec_cloud_use_z)
+    # Filtered on the SAME localizations the Display tab plots (metadata, trace
+    # length and spread filters, fiducial exclusion). If filtering fails the cloud
+    # falls back to the unfiltered file, while the drift estimate skips it.
+    filt <- lapply(names(store), function(fname)
+      tryCatch(batch_filters(qc_exclude_from(store[[fname]], fname), run_set),
+               error = function(e) NULL))
+    names(filt) <- names(store)
+    dfs <- lapply(names(store), function(fname) filt[[fname]] %||% store[[fname]])
+    names(dfs) <- names(store)
+    res <- withProgress(message = "Computing precision cloud...", value = 0,
+      precision_cloud(dfs, min_loc = min_loc, use_z = use_z, drift_dfs = filt,
+                      progress = function(frac, detail) incProgress(frac, detail = detail)))
+    if (is.null(res)) {
+      showNotification("No traces with enough localizations (lower 'Min localizations / trace').",
+                       type = "warning"); prec_cloud_results(NULL); return()
+    }
+    prec_cloud_results(res)
+    showNotification(sprintf("Precision cloud: %s localizations; σ_xy = %.2f nm.",
+                             format(res$n_locs, big.mark = ","), res$sigma_xy),
+                     type = "message", duration = 4)
+  })
 })
 
 output$prec_cloud_plot <- renderPlotly({

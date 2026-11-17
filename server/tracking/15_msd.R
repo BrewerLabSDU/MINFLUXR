@@ -463,50 +463,52 @@ msd_unified_bundle <- eventReactive(input$trk_msd_compute, {
 # why no projection re-calibration is applied, unlike the net-displacement null which
 # receives a raw per-axis D.
 msd_geom_null <- reactive({
-  req(isTRUE(input$trk_msd_geom))
-  ub <- tryCatch(msd_unified_bundle(), error = function(e) NULL); req(!is.null(ub))
-  fr <- tryCatch(msd_unified_fit(ub), error = function(e) NULL)
-  req(!is.null(fr), is.finite(fr$D), fr$D > 0)
-  geom <- .geom_for_null(input$trk_geom_type %||% TRK_DEFAULTS$trk_geom_type)
-  params <- list(
-    R    = max(1, as.numeric(input$trk_disp_R    %||% TRK_DEFAULTS$trk_disp_R)),
-    r    = max(1, as.numeric(input$trk_disp_r    %||% TRK_DEFAULTS$trk_disp_r)),
-    Lcyl = max(1, as.numeric(input$trk_disp_L    %||% TRK_DEFAULTS$trk_disp_L)),
-    a    = max(1, as.numeric(input$trk_disp_a    %||% TRK_DEFAULTS$trk_disp_a)),
-    b    = max(1, as.numeric(input$trk_disp_b    %||% TRK_DEFAULTS$trk_disp_b)),
-    c    = max(1, as.numeric(input$trk_disp_c    %||% TRK_DEFAULTS$trk_disp_c)),
-    mtilt = max(0, as.numeric(input$trk_disp_mtilt %||% TRK_DEFAULTS$trk_disp_mtilt)))
-  # Anything that is not volume-filling sits on the boundary (same mapping the
-  # displacement null uses), so filament and surface both simulate on the surface.
-  mode <- if (identical(input$trk_motion %||% TRK_DEFAULTS$trk_motion, "volume")) "volume" else "surface"
-  keep <- ub$keep_lag & is.finite(ub$msd)
-  lags <- ub$lag[keep]
-  if (!length(lags)) return(NULL)
-  # Lag grid: log-spaced across the whole range so the overlay reads well on any
-  # scale, PLUS an even spread inside the fit window. The fit-window points are what
-  # the D-shortfall estimate below is regressed on, and a purely log grid leaves that
-  # regression resting on a handful of long lags, which made it noisy.
-  lo_w <- max(1L, as.integer(input$trk_uni_min_lag %||% TRK_DEFAULTS$trk_uni_min_lag))
-  hi_w <- max(lo_w + 2L, as.integer(input$trk_uni_max_lag %||% TRK_DEFAULTS$trk_uni_max_lag))
-  hi_w <- min(hi_w, max(lags))
-  grid <- unique(c(
-    round(exp(seq(log(1), log(max(lags)), length.out = 40))),
-    round(seq(lo_w, hi_w, length.out = min(30L, max(3L, hi_w - lo_w + 1L))))))
-  grid <- sort(grid[grid >= 1L])
-  # Cost scales with the LARGEST lag, not the number of points, so keep the ensemble
-  # large - the long-lag points are the noisy ones and they carry the signal.
-  M <- 4000L
-  res <- withProgress(message = "Simulating free diffusion on the geometry…", value = 0.4,
-    sim_free_geom_msd(grid, D_surf = fr$D, geom = geom, params = params,
-                      cyc_ms = ub$t_cycle, proj2d = (ub$ndim == 2L),
-                      mode = mode, M = M))
-  if (is.null(res) || !nrow(res)) return(NULL)
-  res$tau_lin <- res$lag * ub$t_cycle
-  attr(res, "geom") <- geom; attr(res, "mode") <- mode
-  attr(res, "dims") <- .disp_geom_dims(geom, params)
-  attr(res, "D") <- fr$D
-  attr(res, "coef") <- ub$coef_eff %||% (2 * ub$ndim)
-  res
+  with_analysis_seed(input$trk_seed %||% TRK_DEFAULTS$trk_seed, {   # reproducible random draws (R/trk_settings.R)
+    req(isTRUE(input$trk_msd_geom))
+    ub <- tryCatch(msd_unified_bundle(), error = function(e) NULL); req(!is.null(ub))
+    fr <- tryCatch(msd_unified_fit(ub), error = function(e) NULL)
+    req(!is.null(fr), is.finite(fr$D), fr$D > 0)
+    geom <- .geom_for_null(input$trk_geom_type %||% TRK_DEFAULTS$trk_geom_type)
+    params <- list(
+      R    = max(1, as.numeric(input$trk_disp_R    %||% TRK_DEFAULTS$trk_disp_R)),
+      r    = max(1, as.numeric(input$trk_disp_r    %||% TRK_DEFAULTS$trk_disp_r)),
+      Lcyl = max(1, as.numeric(input$trk_disp_L    %||% TRK_DEFAULTS$trk_disp_L)),
+      a    = max(1, as.numeric(input$trk_disp_a    %||% TRK_DEFAULTS$trk_disp_a)),
+      b    = max(1, as.numeric(input$trk_disp_b    %||% TRK_DEFAULTS$trk_disp_b)),
+      c    = max(1, as.numeric(input$trk_disp_c    %||% TRK_DEFAULTS$trk_disp_c)),
+      mtilt = max(0, as.numeric(input$trk_disp_mtilt %||% TRK_DEFAULTS$trk_disp_mtilt)))
+    # Anything that is not volume-filling sits on the boundary (same mapping the
+    # displacement null uses), so filament and surface both simulate on the surface.
+    mode <- if (identical(input$trk_motion %||% TRK_DEFAULTS$trk_motion, "volume")) "volume" else "surface"
+    keep <- ub$keep_lag & is.finite(ub$msd)
+    lags <- ub$lag[keep]
+    if (!length(lags)) return(NULL)
+    # Lag grid: log-spaced across the whole range so the overlay reads well on any
+    # scale, PLUS an even spread inside the fit window. The fit-window points are what
+    # the D-shortfall estimate below is regressed on, and a purely log grid leaves that
+    # regression resting on a handful of long lags, which made it noisy.
+    lo_w <- max(1L, as.integer(input$trk_uni_min_lag %||% TRK_DEFAULTS$trk_uni_min_lag))
+    hi_w <- max(lo_w + 2L, as.integer(input$trk_uni_max_lag %||% TRK_DEFAULTS$trk_uni_max_lag))
+    hi_w <- min(hi_w, max(lags))
+    grid <- unique(c(
+      round(exp(seq(log(1), log(max(lags)), length.out = 40))),
+      round(seq(lo_w, hi_w, length.out = min(30L, max(3L, hi_w - lo_w + 1L))))))
+    grid <- sort(grid[grid >= 1L])
+    # Cost scales with the LARGEST lag, not the number of points, so keep the ensemble
+    # large - the long-lag points are the noisy ones and they carry the signal.
+    M <- 4000L
+    res <- withProgress(message = "Simulating free diffusion on the geometry…", value = 0.4,
+      sim_free_geom_msd(grid, D_surf = fr$D, geom = geom, params = params,
+                        cyc_ms = ub$t_cycle, proj2d = (ub$ndim == 2L),
+                        mode = mode, M = M))
+    if (is.null(res) || !nrow(res)) return(NULL)
+    res$tau_lin <- res$lag * ub$t_cycle
+    attr(res, "geom") <- geom; attr(res, "mode") <- mode
+    attr(res, "dims") <- .disp_geom_dims(geom, params)
+    attr(res, "D") <- fr$D
+    attr(res, "coef") <- ub$coef_eff %||% (2 * ub$ndim)
+    res
+  })
 })
 
 # Fit helper shared by the unified plot + estimates (OLSF + Michalet p_min)
@@ -1087,21 +1089,23 @@ output$trk_sigma_loc_status <- renderUI({
 # given within-track correlation. Gated behind a checkbox (B refits are slower);
 # recomputes only when Plot MSD is pressed with the box ticked.
 trk_unified_boot <- eventReactive(input$trk_msd_compute, {
-  req(isTRUE(input$trk_uni_bootstrap))
-  ub <- tryCatch(msd_unified_bundle(), error = function(e) NULL); req(!is.null(ub))
-  tm <- ub$track_msd; req(!is.null(tm), ncol(tm) >= 5L)
-  B  <- 300L; nc <- ncol(tm)
-  boot_D <- withProgress(message = "Bootstrapping eDIFF 95% CI…", value = 0, {
-    vapply(seq_len(B), function(i) {
-      if (i %% 30L == 0L) incProgress(30 / B)
-      ub2 <- ub
-      ub2$msd <- rowMeans(tm[, sample.int(nc, nc, replace = TRUE), drop = FALSE], na.rm = TRUE)
-      fr <- tryCatch(msd_unified_fit(ub2), error = function(e) NULL)
-      if (is.null(fr) || !is.finite(fr$D)) NA_real_ else fr$D / 1e3   # µm²/s
-    }, numeric(1))
+  with_analysis_seed(input$trk_seed %||% TRK_DEFAULTS$trk_seed, {   # reproducible random draws (R/trk_settings.R)
+    req(isTRUE(input$trk_uni_bootstrap))
+    ub <- tryCatch(msd_unified_bundle(), error = function(e) NULL); req(!is.null(ub))
+    tm <- ub$track_msd; req(!is.null(tm), ncol(tm) >= 5L)
+    B  <- 300L; nc <- ncol(tm)
+    boot_D <- withProgress(message = "Bootstrapping eDIFF 95% CI…", value = 0, {
+      vapply(seq_len(B), function(i) {
+        if (i %% 30L == 0L) incProgress(30 / B)
+        ub2 <- ub
+        ub2$msd <- rowMeans(tm[, sample.int(nc, nc, replace = TRUE), drop = FALSE], na.rm = TRUE)
+        fr <- tryCatch(msd_unified_fit(ub2), error = function(e) NULL)
+        if (is.null(fr) || !is.finite(fr$D)) NA_real_ else fr$D / 1e3   # µm²/s
+      }, numeric(1))
+    })
+    q <- stats::quantile(boot_D, c(0.025, 0.975), names = FALSE, na.rm = TRUE)
+    list(lo = q[1], hi = q[2], B = sum(is.finite(boot_D)))
   })
-  q <- stats::quantile(boot_D, c(0.025, 0.975), names = FALSE, na.rm = TRUE)
-  list(lo = q[1], hi = q[2], B = sum(is.finite(boot_D)))
 })
 
 output$trk_msd_unified_estimates <- renderUI({

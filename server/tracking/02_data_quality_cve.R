@@ -98,227 +98,229 @@
 # reported as `degenerate` - enter σ_loc manually in that case.
 # ============================================================================
 trk_cve_bundle <- eventReactive(input$trk_cve_run, {
-  # The plotted data of the active dataset (filtered, applied with Plot Data), as
-  # every other analysis reads it, so all panels describe the same tracks.
-  df <- tryCatch(trk(), error = function(e) NULL)
-  req(!is.null(df), nrow(df) > 0, all(c("x","y","tid","tim") %in% names(df)))
-  t_c   <- tryCatch(trk_cycle_time(), error = function(e) NA_real_)
-  # Real axial data only - a placeholder all-zero z column would dilute both σ_loc
-  # and D_cve (see .has_real_z).
-  has_z <- .has_real_z(df)
-  # Step arrays from est_cve.R, shared with cve_core() and the diagnostics below.
-  st <- cve_steps(df, t_c, has_z)
-  df <- st$df; n <- st$n; same <- st$same; dt <- st$dt
-  dx <- st$dx; dy <- st$dy; dz <- st$dz; n_cyc <- st$n_cyc
-  integ_step <- st$integ_step; n_steps <- st$n_steps; frac_integ <- st$frac_integ
+  with_analysis_seed(input$trk_seed %||% TRK_DEFAULTS$trk_seed, {   # reproducible random draws (R/trk_settings.R)
+    # The plotted data of the active dataset (filtered, applied with Plot Data), as
+    # every other analysis reads it, so all panels describe the same tracks.
+    df <- tryCatch(trk(), error = function(e) NULL)
+    req(!is.null(df), nrow(df) > 0, all(c("x","y","tid","tim") %in% names(df)))
+    t_c   <- tryCatch(trk_cycle_time(), error = function(e) NA_real_)
+    # Real axial data only - a placeholder all-zero z column would dilute both σ_loc
+    # and D_cve (see .has_real_z).
+    has_z <- .has_real_z(df)
+    # Step arrays from est_cve.R, shared with cve_core() and the diagnostics below.
+    st <- cve_steps(df, t_c, has_z)
+    df <- st$df; n <- st$n; same <- st$same; dt <- st$dt
+    dx <- st$dx; dy <- st$dy; dz <- st$dz; n_cyc <- st$n_cyc
+    integ_step <- st$integ_step; n_steps <- st$n_steps; frac_integ <- st$frac_integ
 
-  # Same integrated fraction, but on the FULLY-FILTERED data (post quality-gate /
-  # end-trim / length / duration / spatial) - the data the analyses actually use.
-  # Lets the panel show raw → after-filters and whether the filters helped.
-  frac_integ_of <- function(d) cve_integrated_fraction(d, t_c)             # R/est_cve.R
-  frac_integ_filt <- frac_integ_of(tryCatch(trk_spatial_filtered(), error = function(e) NULL))
-  # RAW reference = TRUE frozen upload data (never filtered / rechunked), NOT df
-  # (= trk_gap_split, which reads the current - possibly filtered - manifest). This
-  # keeps "raw" at the uploaded value (e.g. 52%) so the raw→analyzed jump is real.
-  frac_integ_raw  <- frac_integ_of(tryCatch(trk_raw_original(),      error = function(e) NULL))
+    # Same integrated fraction, but on the FULLY-FILTERED data (post quality-gate /
+    # end-trim / length / duration / spatial) - the data the analyses actually use.
+    # Lets the panel show raw → after-filters and whether the filters helped.
+    frac_integ_of <- function(d) cve_integrated_fraction(d, t_c)             # R/est_cve.R
+    frac_integ_filt <- frac_integ_of(tryCatch(trk_spatial_filtered(), error = function(e) NULL))
+    # RAW reference = TRUE frozen upload data (never filtered / rechunked), NOT df
+    # (= trk_gap_split, which reads the current - possibly filtered - manifest). This
+    # keeps "raw" at the uploaded value (e.g. 52%) so the raw→analyzed jump is real.
+    frac_integ_raw  <- frac_integ_of(tryCatch(trk_raw_original(),      error = function(e) NULL))
 
-  # Dataset-level cycle-CONTINUITY (tolerance-weighted; same weighting as the
-  # continuity gate) on TRUE RAW (frozen upload) vs ANALYZED (filtered). This reflects
-  # the dark-cycle tolerance, so a dataset with many gentle 1–2-cycle gaps scores
-  # higher than its bare integrated fraction.
-  cont_of <- function(d, H) cve_continuity_mean(d, t_c, H)                 # R/est_cve.R
-  H_disp    <- suppressWarnings(as.numeric(input$trk_quality_darktol %||% TRK_DEFAULTS$trk_quality_darktol))
-  cont_raw  <- cont_of(tryCatch(trk_raw_original(), error = function(e) NULL), H_disp)  # TRUE raw (frozen at upload)
-  cont_filt <- cont_of(tryCatch(trk_spatial_filtered(), error = function(e) NULL), H_disp)  # analyzed (live filtered)
+    # Dataset-level cycle-CONTINUITY (tolerance-weighted; same weighting as the
+    # continuity gate) on TRUE RAW (frozen upload) vs ANALYZED (filtered). This reflects
+    # the dark-cycle tolerance, so a dataset with many gentle 1–2-cycle gaps scores
+    # higher than its bare integrated fraction.
+    cont_of <- function(d, H) cve_continuity_mean(d, t_c, H)                 # R/est_cve.R
+    H_disp    <- suppressWarnings(as.numeric(input$trk_quality_darktol %||% TRK_DEFAULTS$trk_quality_darktol))
+    cont_raw  <- cont_of(tryCatch(trk_raw_original(), error = function(e) NULL), H_disp)  # TRUE raw (frozen at upload)
+    cont_filt <- cont_of(tryCatch(trk_spatial_filtered(), error = function(e) NULL), H_disp)  # analyzed (live filtered)
 
-  # Collection window from the photon budget: t_coll = ECO / EFO.
-  .med_of <- function(cn) if (cn %in% names(df)) {
-                            v <- df[[cn]][is.finite(df[[cn]]) & df[[cn]] > 0]
-                            if (length(v)) stats::median(v) else NA_real_
-                          } else NA_real_
-  eco_m <- .med_of("eco"); efo_m <- .med_of("efo")
-  t_coll <- if (is.finite(eco_m) && is.finite(efo_m) && efo_m > 0) eco_m / efo_m * 1000 else NA_real_
-  n_vert <- {
-    sp <- tryCatch(if (is.null(input$trk_seq_json)) NULL else trk_seq_params(), error = function(e) NULL)
-    v  <- if (!is.null(sp) && isTRUE(sp$ok)) sp$vertices else NA_integer_
-    if (!is.finite(v)) suppressWarnings(as.integer(input$trk_hw_vertices %||% TRK_DEFAULTS$trk_hw_vertices)) else v
-  }
-  if (!is.finite(n_vert) || n_vert < 1L) n_vert <- 6L
-  # CVE core (covariance, blur bounds, σ, D) lives in est_cve.R.
-  cc <- cve_core(dx, dy, dz, dt, integ_step, has_z, t_c, t_coll, n_vert,
-                 R_step = trk_blur()$R_step)
-  shiny::validate(shiny::need(!is.null(cc),
-    "Too few consecutive integrated steps for a CVE estimate - relax filters or check the cycle time."))
-  pair <- cc$pair; prod_x <- cc$prod_x; prod_y <- cc$prod_y; prod_z <- cc$prod_z
-  vals <- rep(NA_real_, cc$n_pairs)                       # only its length is read below
-  cov1 <- cc$cov1; dt_int <- cc$dt_int; R_lo <- cc$R_lo; R_hi <- cc$R_hi; R_blur <- cc$R_blur
-  msq <- cc$msq; sigma2 <- cc$sigma2; sigma <- cc$sigma
-  sigma_xy <- cc$sigma_xy; sigma_z <- cc$sigma_z; sig_aniso <- cc$sig_aniso
-  D_cve <- cc$D_cve; r1_norm <- cc$r1_norm; noise_frac <- cc$noise_frac
+    # Collection window from the photon budget: t_coll = ECO / EFO.
+    .med_of <- function(cn) if (cn %in% names(df)) {
+                              v <- df[[cn]][is.finite(df[[cn]]) & df[[cn]] > 0]
+                              if (length(v)) stats::median(v) else NA_real_
+                            } else NA_real_
+    eco_m <- .med_of("eco"); efo_m <- .med_of("efo")
+    t_coll <- if (is.finite(eco_m) && is.finite(efo_m) && efo_m > 0) eco_m / efo_m * 1000 else NA_real_
+    n_vert <- {
+      sp <- tryCatch(if (is.null(input$trk_seq_json)) NULL else trk_seq_params(), error = function(e) NULL)
+      v  <- if (!is.null(sp) && isTRUE(sp$ok)) sp$vertices else NA_integer_
+      if (!is.finite(v)) suppressWarnings(as.integer(input$trk_hw_vertices %||% TRK_DEFAULTS$trk_hw_vertices)) else v
+    }
+    if (!is.finite(n_vert) || n_vert < 1L) n_vert <- 6L
+    # CVE core (covariance, blur bounds, σ, D) lives in est_cve.R.
+    cc <- cve_core(dx, dy, dz, dt, integ_step, has_z, t_c, t_coll, n_vert,
+                   R_step = trk_blur()$R_step)
+    shiny::validate(shiny::need(!is.null(cc),
+      "Too few consecutive integrated steps for a CVE estimate - relax filters or check the cycle time."))
+    pair <- cc$pair; prod_x <- cc$prod_x; prod_y <- cc$prod_y; prod_z <- cc$prod_z
+    vals <- rep(NA_real_, cc$n_pairs)                       # only its length is read below
+    cov1 <- cc$cov1; dt_int <- cc$dt_int; R_lo <- cc$R_lo; R_hi <- cc$R_hi; R_blur <- cc$R_blur
+    msq <- cc$msq; sigma2 <- cc$sigma2; sigma <- cc$sigma
+    sigma_xy <- cc$sigma_xy; sigma_z <- cc$sigma_z; sig_aniso <- cc$sig_aniso
+    D_cve <- cc$D_cve; r1_norm <- cc$r1_norm; noise_frac <- cc$noise_frac
 
-  # ── Per-track σ_loc heterogeneity ──────────────────────────────────────────
-  # One CVE σ per track (tracks with ≥ n_min integrated steps), skipping the
-  # first `skip` localizations - MINFLUX iterates onto the molecule, so the
-  # opening localizations carry lock-on transient and read worse. The spread of
-  # this distribution says whether a single global σ_loc is a good approximation.
-  n_min_pt <- max(10L, as.integer(input$trk_sig_min_integ %||% TRK_DEFAULTS$trk_sig_min_integ))
-  skip_pt  <- max(0L,  as.integer(input$trk_sig_skip %||% TRK_DEFAULTS$trk_sig_skip))
-  pos  <- sequence(rle(df$tid)$lengths)                     # within-track index (df sorted)
-  post <- pos > skip_pt                                     # localization kept (past lock-on)
-  step_post  <- same & post & c(FALSE, post[-n])            # step between two kept locs
-  integ_post <- step_post & is.finite(n_cyc) & (n_cyc == 1L); integ_post[is.na(integ_post)] <- FALSE
-  pair_pt <- integ_post & c(integ_post[-1], FALSE)          # consecutive integrated kept pair
-  tid_pt  <- df$tid[pair_pt]
-  pv <- c(prod_x[pair_pt], prod_y[pair_pt]); tv <- c(tid_pt, tid_pt)
-  if (has_z) { pv <- c(pv, prod_z[pair_pt]); tv <- c(tv, tid_pt) }
-  okpv <- is.finite(pv); pv <- pv[okpv]; tv <- tv[okpv]
-  # ECO = photon counts (correct for σ ∝ 1/√N); EFO = emission frequency (fallback).
-  phot_col <- if ("eco" %in% names(df) && any(is.finite(df$eco) & df$eco > 0)) "eco"
-              else if ("efo" %in% names(df) && any(is.finite(df$efo) & df$efo > 0)) "efo"
-              else NA_character_
-  # Per-track σ carries the same blur correction. Note what it can and cannot
-  # say: at R ≈ 1/6 the R*⟨Δx²⟩ term is ~90% of σ², so per-track differences here
-  # track the per-track STEP SIZE far more than the photon budget.
-  # Kept for the outlier/degenerate QC below, not as a precision measurement -
-  # the per-localization photon estimate is what the panel plots.
-  sq_x_pt <- dx^2; sq_y_pt <- dy^2; sq_z_pt <- if (has_z) dz^2 else rep(NA_real_, n)
-  msq_by_tid <- {
-    v <- c(sq_x_pt[integ_post], sq_y_pt[integ_post])
-    t2 <- c(df$tid[integ_post], df$tid[integ_post])
-    if (has_z) { v <- c(v, sq_z_pt[integ_post]); t2 <- c(t2, df$tid[integ_post]) }
-    ok <- is.finite(v); tapply(v[ok], t2[ok], mean)
-  }
-  pertrack_sigma <- if (length(pv)) {
-    cov_by <- tapply(pv, tv, mean)                    # per-track cov1
-    s2_by  <- vapply(names(cov_by), function(nm) {
-                mq <- msq_by_tid[[nm]]
-                if (is.null(mq) || !is.finite(mq)) -1
-                else R_blur * mq + (2 * R_blur - 1) * cov_by[[nm]]
-              }, numeric(1))
-    n_by   <- tapply(integ_post, df$tid, sum)[names(s2_by)]
-    # Photon predictor for the precision model. σ_loc ≈ L_TCP/(2√N) depends on the
-    # photon COUNT N, so ECO (effective counts) is the physically correct variable.
-    # EFO is a FREQUENCY (emission rate); it only tracks N when the dwell time is
-    # constant, which MINFLUX tracking violates (dwell varies, especially around dark
-    # cycles), so it is a fallback only. Using ECO also gives a testable prediction:
-    # the log-log slope should be ≈ -0.5.
-    phot_by <- if (!is.na(phot_col)) {
-                 kl <- post & is.finite(df[[phot_col]]) & df[[phot_col]] > 0
-                 tapply(df[[phot_col]][kl], df$tid[kl], stats::median)[names(s2_by)]
-               } else stats::setNames(rep(NA_real_, length(s2_by)), names(s2_by))
-    # Per-track step variance, reported with the per-track table.
-    v_by <- tapply(dx[integ_post]^2 + dy[integ_post]^2,
-                   df$tid[integ_post], mean, na.rm = TRUE)[names(s2_by)]
-    data.frame(tid = names(s2_by), sigma = sqrt(pmax(0, as.numeric(s2_by))),
-               n_integ = as.integer(n_by), phot_med = as.numeric(phot_by),
-               var_step = as.numeric(v_by),
-               degenerate = as.numeric(s2_by) <= 0, stringsAsFactors = FALSE)
-  } else NULL
-  if (!is.null(pertrack_sigma))
-    pertrack_sigma <- pertrack_sigma[is.finite(pertrack_sigma$n_integ) &
-                                     pertrack_sigma$n_integ >= n_min_pt, , drop = FALSE]
-  sig_pt_ok  <- if (!is.null(pertrack_sigma) && nrow(pertrack_sigma))
-                  pertrack_sigma$sigma[!pertrack_sigma$degenerate] else numeric(0)
-  sig_pt_med <- if (length(sig_pt_ok) >= 5L) stats::median(sig_pt_ok) else NA_real_
-  sig_pt_iqr <- if (length(sig_pt_ok) >= 5L)
-                  as.numeric(diff(stats::quantile(sig_pt_ok, c(.25, .75)))) else NA_real_
-  sig_pt_cv  <- if (is.finite(sig_pt_med) && sig_pt_med > 0 && length(sig_pt_ok) >= 5L)
-                  stats::sd(sig_pt_ok) / mean(sig_pt_ok) else NA_real_
-  # 95% CI on the per-track-median σ_loc (bootstrap over tracks).
-  sig_ci <- if (length(sig_pt_ok) >= 5L) .boot_ci(sig_pt_ok, stats::median, B = 1000L) else c(lo = NA_real_, hi = NA_real_)
+    # ── Per-track σ_loc heterogeneity ──────────────────────────────────────────
+    # One CVE σ per track (tracks with ≥ n_min integrated steps), skipping the
+    # first `skip` localizations - MINFLUX iterates onto the molecule, so the
+    # opening localizations carry lock-on transient and read worse. The spread of
+    # this distribution says whether a single global σ_loc is a good approximation.
+    n_min_pt <- max(10L, as.integer(input$trk_sig_min_integ %||% TRK_DEFAULTS$trk_sig_min_integ))
+    skip_pt  <- max(0L,  as.integer(input$trk_sig_skip %||% TRK_DEFAULTS$trk_sig_skip))
+    pos  <- sequence(rle(df$tid)$lengths)                     # within-track index (df sorted)
+    post <- pos > skip_pt                                     # localization kept (past lock-on)
+    step_post  <- same & post & c(FALSE, post[-n])            # step between two kept locs
+    integ_post <- step_post & is.finite(n_cyc) & (n_cyc == 1L); integ_post[is.na(integ_post)] <- FALSE
+    pair_pt <- integ_post & c(integ_post[-1], FALSE)          # consecutive integrated kept pair
+    tid_pt  <- df$tid[pair_pt]
+    pv <- c(prod_x[pair_pt], prod_y[pair_pt]); tv <- c(tid_pt, tid_pt)
+    if (has_z) { pv <- c(pv, prod_z[pair_pt]); tv <- c(tv, tid_pt) }
+    okpv <- is.finite(pv); pv <- pv[okpv]; tv <- tv[okpv]
+    # ECO = photon counts (correct for σ ∝ 1/√N); EFO = emission frequency (fallback).
+    phot_col <- if ("eco" %in% names(df) && any(is.finite(df$eco) & df$eco > 0)) "eco"
+                else if ("efo" %in% names(df) && any(is.finite(df$efo) & df$efo > 0)) "efo"
+                else NA_character_
+    # Per-track σ carries the same blur correction. Note what it can and cannot
+    # say: at R ≈ 1/6 the R*⟨Δx²⟩ term is ~90% of σ², so per-track differences here
+    # track the per-track STEP SIZE far more than the photon budget.
+    # Kept for the outlier/degenerate QC below, not as a precision measurement -
+    # the per-localization photon estimate is what the panel plots.
+    sq_x_pt <- dx^2; sq_y_pt <- dy^2; sq_z_pt <- if (has_z) dz^2 else rep(NA_real_, n)
+    msq_by_tid <- {
+      v <- c(sq_x_pt[integ_post], sq_y_pt[integ_post])
+      t2 <- c(df$tid[integ_post], df$tid[integ_post])
+      if (has_z) { v <- c(v, sq_z_pt[integ_post]); t2 <- c(t2, df$tid[integ_post]) }
+      ok <- is.finite(v); tapply(v[ok], t2[ok], mean)
+    }
+    pertrack_sigma <- if (length(pv)) {
+      cov_by <- tapply(pv, tv, mean)                    # per-track cov1
+      s2_by  <- vapply(names(cov_by), function(nm) {
+                  mq <- msq_by_tid[[nm]]
+                  if (is.null(mq) || !is.finite(mq)) -1
+                  else R_blur * mq + (2 * R_blur - 1) * cov_by[[nm]]
+                }, numeric(1))
+      n_by   <- tapply(integ_post, df$tid, sum)[names(s2_by)]
+      # Photon predictor for the precision model. σ_loc ≈ L_TCP/(2√N) depends on the
+      # photon COUNT N, so ECO (effective counts) is the physically correct variable.
+      # EFO is a FREQUENCY (emission rate); it only tracks N when the dwell time is
+      # constant, which MINFLUX tracking violates (dwell varies, especially around dark
+      # cycles), so it is a fallback only. Using ECO also gives a testable prediction:
+      # the log-log slope should be ≈ -0.5.
+      phot_by <- if (!is.na(phot_col)) {
+                   kl <- post & is.finite(df[[phot_col]]) & df[[phot_col]] > 0
+                   tapply(df[[phot_col]][kl], df$tid[kl], stats::median)[names(s2_by)]
+                 } else stats::setNames(rep(NA_real_, length(s2_by)), names(s2_by))
+      # Per-track step variance, reported with the per-track table.
+      v_by <- tapply(dx[integ_post]^2 + dy[integ_post]^2,
+                     df$tid[integ_post], mean, na.rm = TRUE)[names(s2_by)]
+      data.frame(tid = names(s2_by), sigma = sqrt(pmax(0, as.numeric(s2_by))),
+                 n_integ = as.integer(n_by), phot_med = as.numeric(phot_by),
+                 var_step = as.numeric(v_by),
+                 degenerate = as.numeric(s2_by) <= 0, stringsAsFactors = FALSE)
+    } else NULL
+    if (!is.null(pertrack_sigma))
+      pertrack_sigma <- pertrack_sigma[is.finite(pertrack_sigma$n_integ) &
+                                       pertrack_sigma$n_integ >= n_min_pt, , drop = FALSE]
+    sig_pt_ok  <- if (!is.null(pertrack_sigma) && nrow(pertrack_sigma))
+                    pertrack_sigma$sigma[!pertrack_sigma$degenerate] else numeric(0)
+    sig_pt_med <- if (length(sig_pt_ok) >= 5L) stats::median(sig_pt_ok) else NA_real_
+    sig_pt_iqr <- if (length(sig_pt_ok) >= 5L)
+                    as.numeric(diff(stats::quantile(sig_pt_ok, c(.25, .75)))) else NA_real_
+    sig_pt_cv  <- if (is.finite(sig_pt_med) && sig_pt_med > 0 && length(sig_pt_ok) >= 5L)
+                    stats::sd(sig_pt_ok) / mean(sig_pt_ok) else NA_real_
+    # 95% CI on the per-track-median σ_loc (bootstrap over tracks).
+    sig_ci <- if (length(sig_pt_ok) >= 5L) .boot_ci(sig_pt_ok, stats::median, B = 1000L) else c(lo = NA_real_, hi = NA_real_)
 
-  # ── Linking / sanity QC ─────────────────────────────────────────────────────
-  # (1) Implausible jumps: a step whose |Δr| far exceeds what free diffusion +
-  #     localization noise allow for its OWN gap (E[|Δr|²] = 2d·D·Δt + 2d·σ²).
-  #     A big jump after one cycle is suspicious; after a long dark gap it isn't
-  #     (the Δt term grows), so this naturally accounts for dark cycles. Flags
-  #     mis-links / re-acquisition errors. (2) Suspicious tracks: per-track σ_loc
-  #     that is degenerate (σ²<0) or a far outlier - candidate bad/mis-linked tracks.
-  sig_use <- if (is.finite(sig_pt_med)) sig_pt_med else sigma
-  d_dim   <- if (has_z) 3 else 2
-  n_implaus <- NA_integer_; frac_implaus <- NA_real_
-  if (is.finite(D_cve) && D_cve > 0 && is.finite(sig_use)) {
-    dr2  <- dx^2 + dy^2 + if (has_z) dz^2 else 0            # NA where !same
-    exp2 <- 2 * d_dim * D_cve * dt + 2 * d_dim * sig_use^2  # expected E[|Δr|²] per step
-    ratio2 <- dr2 / exp2
-    implaus <- same & is.finite(ratio2) & (ratio2 > 25)     # |Δr| > 5× expected RMS
-    n_implaus    <- sum(implaus, na.rm = TRUE)
-    frac_implaus <- if (n_steps > 0) n_implaus / n_steps else NA_real_
-  }
-  n_suspect <- if (!is.null(pertrack_sigma) && nrow(pertrack_sigma) >= 5L) {
-    sg  <- pertrack_sigma$sigma
-    ok  <- !pertrack_sigma$degenerate & is.finite(sg)
-    med0 <- stats::median(sg[ok]); iqr0 <- stats::IQR(sg[ok])
-    sum(pertrack_sigma$degenerate | (is.finite(sg) & sg > med0 + 3 * iqr0), na.rm = TRUE)
-  } else NA_integer_
-  n_tracks_pt <- if (!is.null(pertrack_sigma)) nrow(pertrack_sigma) else NA_integer_
+    # ── Linking / sanity QC ─────────────────────────────────────────────────────
+    # (1) Implausible jumps: a step whose |Δr| far exceeds what free diffusion +
+    #     localization noise allow for its OWN gap (E[|Δr|²] = 2d·D·Δt + 2d·σ²).
+    #     A big jump after one cycle is suspicious; after a long dark gap it isn't
+    #     (the Δt term grows), so this naturally accounts for dark cycles. Flags
+    #     mis-links / re-acquisition errors. (2) Suspicious tracks: per-track σ_loc
+    #     that is degenerate (σ²<0) or a far outlier - candidate bad/mis-linked tracks.
+    sig_use <- if (is.finite(sig_pt_med)) sig_pt_med else sigma
+    d_dim   <- if (has_z) 3 else 2
+    n_implaus <- NA_integer_; frac_implaus <- NA_real_
+    if (is.finite(D_cve) && D_cve > 0 && is.finite(sig_use)) {
+      dr2  <- dx^2 + dy^2 + if (has_z) dz^2 else 0            # NA where !same
+      exp2 <- 2 * d_dim * D_cve * dt + 2 * d_dim * sig_use^2  # expected E[|Δr|²] per step
+      ratio2 <- dr2 / exp2
+      implaus <- same & is.finite(ratio2) & (ratio2 > 25)     # |Δr| > 5× expected RMS
+      n_implaus    <- sum(implaus, na.rm = TRUE)
+      frac_implaus <- if (n_steps > 0) n_implaus / n_steps else NA_real_
+    }
+    n_suspect <- if (!is.null(pertrack_sigma) && nrow(pertrack_sigma) >= 5L) {
+      sg  <- pertrack_sigma$sigma
+      ok  <- !pertrack_sigma$degenerate & is.finite(sg)
+      med0 <- stats::median(sg[ok]); iqr0 <- stats::IQR(sg[ok])
+      sum(pertrack_sigma$degenerate | (is.finite(sg) & sg > med0 + 3 * iqr0), na.rm = TRUE)
+    } else NA_integer_
+    n_tracks_pt <- if (!is.null(pertrack_sigma)) nrow(pertrack_sigma) else NA_integer_
 
-  # ── Photon channel: DIAGNOSTIC ONLY (photon weighting has been REMOVED) ─────
-  # There used to be an inverse-variance "photon-weighted" CVE here (fit σ ∝ photons^p,
-  # then weight steps by the predicted σ). It is gone: photon counts differ between
-  # tracks for several reasons besides precision (mobility, bleaching, emitter
-  # brightness, background), so weighting by them would weight the tracks by
-  # whatever drives those differences. The CVE weights every step equally.
-  #   noise_frac - how much of the step variance is localization noise (−2·r₁).
+    # ── Photon channel: DIAGNOSTIC ONLY (photon weighting has been REMOVED) ─────
+    # There used to be an inverse-variance "photon-weighted" CVE here (fit σ ∝ photons^p,
+    # then weight steps by the predicted σ). It is gone: photon counts differ between
+    # tracks for several reasons besides precision (mobility, bleaching, emitter
+    # brightness, background), so weighting by them would weight the tracks by
+    # whatever drives those differences. The CVE weights every step equally.
+    #   noise_frac - how much of the step variance is localization noise (−2·r₁).
 
-  # ── σ_loc from the photon budget - the value the app actually uses ─────────
-  # σ_i = L_TCP / (a*sqrt(N_i)) per localization, N = eco, a the measured effective
-  # prefactor, plus the pattern's off-centre term (.crlb_doughnut, est_cve.R). It is
-  # per-localization rather than pooled, and does not inherit the step-size
-  # inflation that population heterogeneity and drift push into the CVE's ⟨Δx²⟩
-  # term. The CVE σ above is kept as a diagnostic only.
+    # ── σ_loc from the photon budget - the value the app actually uses ─────────
+    # σ_i = L_TCP / (a*sqrt(N_i)) per localization, N = eco, a the measured effective
+    # prefactor, plus the pattern's off-centre term (.crlb_doughnut, est_cve.R). It is
+    # per-localization rather than pooled, and does not inherit the step-size
+    # inflation that population heterogeneity and drift push into the CVE's ⟨Δx²⟩
+    # term. The CVE σ above is kept as a diagnostic only.
 
-  L_tcp <- suppressWarnings(as.numeric(input$trk_L_tcp %||% DMAX_L_TCP_DEFAULT))
-  if (!is.finite(L_tcp) || L_tcp <= 0) L_tcp <- DMAX_L_TCP_DEFAULT
-  ecov  <- if ("eco" %in% names(df)) df$eco[is.finite(df$eco) & df$eco > 0] else numeric(0)
-  # The emitter drifts off the TCP centre while photons are collected; D from the
-  # CVE above and the single-cycle interval set how far. The pattern sets how
-  # fast precision falls off with that offset (TCP_PATTERN_GEOM).
-  nu_beam <- suppressWarnings(as.numeric(input$trk_beam_fwhm %||% TCP_BEAM_FWHM_NM))
-  if (!is.finite(nu_beam) || nu_beam <= 0) nu_beam <- TCP_BEAM_FWHM_NM
-  tcp_pat <- input$trk_tcp_pattern %||% TCP_PATTERN_DEFAULT
-  D_off   <- if (is.finite(D_cve) && D_cve > 0) D_cve else 0
-  t_off   <- if (is.finite(dt_int) && dt_int > 0) dt_int else 0
-  r_off   <- sqrt(.tcp_geom(tcp_pat)$dim * D_off * t_off)   # rms offset over the exposure, nm
-  a_pref <- .a_in_use(tcp_pat)
-  sig_phot_i   <- if (length(ecov)) .crlb_doughnut(L_tcp, nu_beam, ecov, D = D_off, t_loc = t_off,
-                                                   pref = a_pref, pattern = tcp_pat) else numeric(0)
-  sig_phot_med <- if (length(sig_phot_i)) stats::median(sig_phot_i) else NA_real_
-  sig_phot_iqr <- if (length(sig_phot_i) >= 5L)
-                    as.numeric(diff(stats::quantile(sig_phot_i, c(.25, .75)))) else NA_real_
-  eco_med      <- if (length(ecov)) stats::median(ecov) else NA_real_
-  # Headline D: the upper lag regime of the ensemble MSD, with the MSD panel's fit
-  # settings. The CVE
-  # above uses single-cycle steps, the lower regime, and is kept as a check.
-  ms  <- .msd_settings(df)
-  cch <- tryCatch(trk_cluster_cycle(), error = function(e) NULL)
-  hd  <- tryCatch(msd_headline(df, t_c, if (!is.null(cch) && is.finite(cch$sw)) cch$sw else 0,
-                               ms$window, ms$track_weight, ms$iterative, ms$linear_tau, ms$R,
-                               if (ms$has_z) ms$coef[["d3"]] else ms$coef[["d2"]], ms$min_pts, ms$has_z),
-                  error = function(e) NULL)
+    L_tcp <- suppressWarnings(as.numeric(input$trk_L_tcp %||% DMAX_L_TCP_DEFAULT))
+    if (!is.finite(L_tcp) || L_tcp <= 0) L_tcp <- DMAX_L_TCP_DEFAULT
+    ecov  <- if ("eco" %in% names(df)) df$eco[is.finite(df$eco) & df$eco > 0] else numeric(0)
+    # The emitter drifts off the TCP centre while photons are collected; D from the
+    # CVE above and the single-cycle interval set how far. The pattern sets how
+    # fast precision falls off with that offset (TCP_PATTERN_GEOM).
+    nu_beam <- suppressWarnings(as.numeric(input$trk_beam_fwhm %||% TCP_BEAM_FWHM_NM))
+    if (!is.finite(nu_beam) || nu_beam <= 0) nu_beam <- TCP_BEAM_FWHM_NM
+    tcp_pat <- input$trk_tcp_pattern %||% TCP_PATTERN_DEFAULT
+    D_off   <- if (is.finite(D_cve) && D_cve > 0) D_cve else 0
+    t_off   <- if (is.finite(dt_int) && dt_int > 0) dt_int else 0
+    r_off   <- sqrt(.tcp_geom(tcp_pat)$dim * D_off * t_off)   # rms offset over the exposure, nm
+    a_pref <- .a_in_use(tcp_pat)
+    sig_phot_i   <- if (length(ecov)) .crlb_doughnut(L_tcp, nu_beam, ecov, D = D_off, t_loc = t_off,
+                                                     pref = a_pref, pattern = tcp_pat) else numeric(0)
+    sig_phot_med <- if (length(sig_phot_i)) stats::median(sig_phot_i) else NA_real_
+    sig_phot_iqr <- if (length(sig_phot_i) >= 5L)
+                      as.numeric(diff(stats::quantile(sig_phot_i, c(.25, .75)))) else NA_real_
+    eco_med      <- if (length(ecov)) stats::median(ecov) else NA_real_
+    # Headline D: the upper lag regime of the ensemble MSD, with the MSD panel's fit
+    # settings. The CVE
+    # above uses single-cycle steps, the lower regime, and is kept as a check.
+    ms  <- .msd_settings(df)
+    cch <- tryCatch(trk_cluster_cycle(), error = function(e) NULL)
+    hd  <- tryCatch(msd_headline(df, t_c, if (!is.null(cch) && is.finite(cch$sw)) cch$sw else 0,
+                                 ms$window, ms$track_weight, ms$iterative, ms$linear_tau, ms$R,
+                                 if (ms$has_z) ms$coef[["d3"]] else ms$coef[["d2"]], ms$min_pts, ms$has_z),
+                    error = function(e) NULL)
 
-  list(sigma = sigma, sigma2 = sigma2, cov1 = cov1, n_pairs = length(vals),
-       R_blur = R_blur, msq = msq, n_vert = n_vert, t_coll = t_coll,
-       sig_phot = sig_phot_i, sig_phot_med = sig_phot_med, sig_phot_iqr = sig_phot_iqr,
-       eco_med = eco_med, L_tcp = L_tcp, n_phot = length(ecov),
-       nu_beam = nu_beam, r_off = r_off, tcp_pattern = tcp_pat,
-       sig_simple = if (length(ecov)) stats::median(L_tcp / (a_pref * sqrt(ecov))) else NA_real_,
-       a_pref = a_pref,
-       sigma_xy = sigma_xy, sigma_z = sigma_z, sig_aniso = sig_aniso,
-       D_cve = D_cve, dt_int = dt_int, t_cycle = t_c, has_z = has_z,
-       frac_integ = frac_integ_raw, frac_integ_filt = frac_integ_filt,
-       cont_raw = cont_raw, cont_filt = cont_filt, cont_H = H_disp,
-       n_steps = n_steps, degenerate = sigma2 <= 0,
-       pertrack_sigma = pertrack_sigma, sig_pt_med = sig_pt_med,
-       sig_pt_iqr = sig_pt_iqr, sig_pt_cv = sig_pt_cv, sig_pt_lo = sig_ci[["lo"]],
-       sig_pt_hi = sig_ci[["hi"]], n_pt = length(sig_pt_ok),
-       n_implaus = n_implaus, frac_implaus = frac_implaus,
-       n_suspect = n_suspect, n_tracks_pt = n_tracks_pt,
-       phot_col = phot_col,   # photon column used for the diagnostics
-       r1_norm = r1_norm, noise_frac = noise_frac,
-       D_msd = if (!is.null(hd)) hd$D else NA_real_, msd_window = ms$window,
-       msd_fit_lags = if (!is.null(hd)) hd$fit_lags else NULL,
-       msd_fit_tau  = if (!is.null(hd)) hd$fit_tau else NULL)
+    list(sigma = sigma, sigma2 = sigma2, cov1 = cov1, n_pairs = length(vals),
+         R_blur = R_blur, msq = msq, n_vert = n_vert, t_coll = t_coll,
+         sig_phot = sig_phot_i, sig_phot_med = sig_phot_med, sig_phot_iqr = sig_phot_iqr,
+         eco_med = eco_med, L_tcp = L_tcp, n_phot = length(ecov),
+         nu_beam = nu_beam, r_off = r_off, tcp_pattern = tcp_pat,
+         sig_simple = if (length(ecov)) stats::median(L_tcp / (a_pref * sqrt(ecov))) else NA_real_,
+         a_pref = a_pref,
+         sigma_xy = sigma_xy, sigma_z = sigma_z, sig_aniso = sig_aniso,
+         D_cve = D_cve, dt_int = dt_int, t_cycle = t_c, has_z = has_z,
+         frac_integ = frac_integ_raw, frac_integ_filt = frac_integ_filt,
+         cont_raw = cont_raw, cont_filt = cont_filt, cont_H = H_disp,
+         n_steps = n_steps, degenerate = sigma2 <= 0,
+         pertrack_sigma = pertrack_sigma, sig_pt_med = sig_pt_med,
+         sig_pt_iqr = sig_pt_iqr, sig_pt_cv = sig_pt_cv, sig_pt_lo = sig_ci[["lo"]],
+         sig_pt_hi = sig_ci[["hi"]], n_pt = length(sig_pt_ok),
+         n_implaus = n_implaus, frac_implaus = frac_implaus,
+         n_suspect = n_suspect, n_tracks_pt = n_tracks_pt,
+         phot_col = phot_col,   # photon column used for the diagnostics
+         r1_norm = r1_norm, noise_frac = noise_frac,
+         D_msd = if (!is.null(hd)) hd$D else NA_real_, msd_window = ms$window,
+         msd_fit_lags = if (!is.null(hd)) hd$fit_lags else NULL,
+         msd_fit_tau  = if (!is.null(hd)) hd$fit_tau else NULL)
+  })
 })
 
 # Publish the calibration result as the app-wide σ_loc.

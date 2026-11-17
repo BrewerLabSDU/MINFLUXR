@@ -31,91 +31,93 @@ crowd_results    <- reactiveVal(NULL)
 crowd_null_stats <- reactiveVal(NULL)   # list(rho_obs, p, B, outside) from the permutation null
 
 observeEvent(input$run_crowd, {
-  store <- smlm_file_store()
-  if (!length(store)) { showNotification("No files loaded.", type = "warning"); return() }
-  if (!cluster2_on()) {
-    showNotification(sprintf("Enable %s in the Display tab first.", cluster2_label()),
-                     type = "warning"); return()
-  }
-  if (!isTRUE(input$crowd_all_files)) {
-    af <- input$active_file
-    if (!is.null(af) && af %in% names(store)) store <- store[af]
-  }
-
-  min_n  <- max(3L, as.integer(input$crowd_min_members %||% 4L))
-  kk     <- max(1L, as.integer(input$crowd_k %||% 1L))
-  use_3d <- isTRUE(input$crowd_use_3d)
-
-  # ── no-crowding null (label permutation) ──────────────────────────────────
-  # The panel's y-axis has a trend built in even with NO crowding effect: denser
-  # clusters hold more traces, and the MEDIAN of a larger sample drawn from a
-  # decaying detection-rate distribution lands later purely by sampling. To make
-  # the plot readable we need the "zero crowding" expectation drawn on it.
-  #
-  # WHY A PERMUTATION AND NOT THE SIMULATOR: shuffling the detection times among
-  # the traces of a file keeps the real cluster membership, the real sizes, the
-  # real geometry (so every point's x stays exactly where it is) and the real
-  # detection-time distribution of that acquisition - it destroys ONLY the
-  # association being tested. A simulator null would instead require assuming a
-  # bleaching/detection model, which is itself calibrated from data of this kind;
-  # that would make the test partly circular. The permutation is exact,
-  # assumption-free and cheaper.
-  do_null <- isTRUE(input$crowd_null)
-  B       <- if (do_null) max(49L, min(2000L, as.integer(input$crowd_nsim %||% 200L))) else 0L
-
-  rows      <- list()
-  null_rows <- list()   # per file: structures x B matrix of null time shifts
-  # Why-it-found-nothing counters. An empty result has several distinct causes,
-  # so each one is counted and named in the warning.
-  diag <- c(no_tim = 0L, filtered_out = 0L, no_c2 = 0L, no_z = 0L,
-            no_clusters = 0L, no_background = 0L, too_small = 0L)
-  withProgress(message = "Computing crowding vs detection-time shift...", value = 0, {
-    n_files <- length(store)
-    for (i in seq_along(store)) {
-      fname <- names(store)[[i]]
-      incProgress(1 / n_files, detail = fname)
-      df <- qc_exclude_from(store[[fname]], fname)
-      if (!is.data.frame(df) || !nrow(df) || !"tim" %in% names(df)) { diag["no_tim"] <- diag["no_tim"] + 1L; next }
-      df  <- prepared_df(fname)   # cached filter -> thin -> cluster chain
-      got <- crowding_for_file(df, fname, id_col = smlm_nn_unit(df), min_n = min_n,
-                               k = kk, use_3d = use_3d, B = B)
-      diag[names(got$diag)] <- diag[names(got$diag)] + got$diag
-      if (!is.null(got$rows)) rows[[length(rows) + 1L]] <- got$rows
-      if (!is.null(got$null)) null_rows[[length(null_rows) + 1L]] <- got$null
+  with_analysis_seed(input$smlm_seed %||% SMLM_DEFAULTS$smlm_seed, {   # reproducible random draws (R/trk_settings.R)
+    store <- smlm_file_store()
+    if (!length(store)) { showNotification("No files loaded.", type = "warning"); return() }
+    if (!cluster2_on()) {
+      showNotification(sprintf("Enable %s in the Display tab first.", cluster2_label()),
+                       type = "warning"); return()
     }
-  })
+    if (!isTRUE(input$crowd_all_files)) {
+      af <- input$active_file
+      if (!is.null(af) && af %in% names(store)) store <- store[af]
+    }
 
-  res <- if (length(rows)) do.call(rbind, rows) else NULL
-  if (is.null(res) || !nrow(res)) {
-    why <- c(
-      if (diag["no_tim"])        sprintf("%d file(s) have no `tim` column", diag["no_tim"]),
-      if (diag["filtered_out"])  sprintf("%d file(s) left empty by the Display-tab metadata filters", diag["filtered_out"]),
-      if (diag["no_c2"])         sprintf("%d file(s) produced no cluster2 column (is Median Clustering enabled?)", diag["no_c2"]),
-      if (diag["no_z"])          sprintf("%d file(s) have no z (uncheck 'Use 3-D coordinates')", diag["no_z"]),
-      if (diag["no_clusters"])   sprintf("%d file(s) yielded no Median Cluster structures at all", diag["no_clusters"]),
-      if (diag["no_background"]) sprintf("%d file(s) had no UNCLUSTERED traces to use as the time reference", diag["no_background"]),
-      if (diag["too_small"])     sprintf("%d structure(s) had fewer than %d traces", diag["too_small"], min_n))
+    min_n  <- max(3L, as.integer(input$crowd_min_members %||% 4L))
+    kk     <- max(1L, as.integer(input$crowd_k %||% 1L))
+    use_3d <- isTRUE(input$crowd_use_3d)
+
+    # ── no-crowding null (label permutation) ──────────────────────────────────
+    # The panel's y-axis has a trend built in even with NO crowding effect: denser
+    # clusters hold more traces, and the MEDIAN of a larger sample drawn from a
+    # decaying detection-rate distribution lands later purely by sampling. To make
+    # the plot readable we need the "zero crowding" expectation drawn on it.
+    #
+    # WHY A PERMUTATION AND NOT THE SIMULATOR: shuffling the detection times among
+    # the traces of a file keeps the real cluster membership, the real sizes, the
+    # real geometry (so every point's x stays exactly where it is) and the real
+    # detection-time distribution of that acquisition - it destroys ONLY the
+    # association being tested. A simulator null would instead require assuming a
+    # bleaching/detection model, which is itself calibrated from data of this kind;
+    # that would make the test partly circular. The permutation is exact,
+    # assumption-free and cheaper.
+    do_null <- isTRUE(input$crowd_null)
+    B       <- if (do_null) max(49L, min(2000L, as.integer(input$crowd_nsim %||% 200L))) else 0L
+
+    rows      <- list()
+    null_rows <- list()   # per file: structures x B matrix of null time shifts
+    # Why-it-found-nothing counters. An empty result has several distinct causes,
+    # so each one is counted and named in the warning.
+    diag <- c(no_tim = 0L, filtered_out = 0L, no_c2 = 0L, no_z = 0L,
+              no_clusters = 0L, no_background = 0L, too_small = 0L)
+    withProgress(message = "Computing crowding vs detection-time shift...", value = 0, {
+      n_files <- length(store)
+      for (i in seq_along(store)) {
+        fname <- names(store)[[i]]
+        incProgress(1 / n_files, detail = fname)
+        df <- qc_exclude_from(store[[fname]], fname)
+        if (!is.data.frame(df) || !nrow(df) || !"tim" %in% names(df)) { diag["no_tim"] <- diag["no_tim"] + 1L; next }
+        df  <- prepared_df(fname)   # cached filter -> thin -> cluster chain
+        got <- crowding_for_file(df, fname, id_col = smlm_nn_unit(df), min_n = min_n,
+                                 k = kk, use_3d = use_3d, B = B)
+        diag[names(got$diag)] <- diag[names(got$diag)] + got$diag
+        if (!is.null(got$rows)) rows[[length(rows) + 1L]] <- got$rows
+        if (!is.null(got$null)) null_rows[[length(null_rows) + 1L]] <- got$null
+      }
+    })
+
+    res <- if (length(rows)) do.call(rbind, rows) else NULL
+    if (is.null(res) || !nrow(res)) {
+      why <- c(
+        if (diag["no_tim"])        sprintf("%d file(s) have no `tim` column", diag["no_tim"]),
+        if (diag["filtered_out"])  sprintf("%d file(s) left empty by the Display-tab metadata filters", diag["filtered_out"]),
+        if (diag["no_c2"])         sprintf("%d file(s) produced no cluster2 column (is Median Clustering enabled?)", diag["no_c2"]),
+        if (diag["no_z"])          sprintf("%d file(s) have no z (uncheck 'Use 3-D coordinates')", diag["no_z"]),
+        if (diag["no_clusters"])   sprintf("%d file(s) yielded no Median Cluster structures at all", diag["no_clusters"]),
+        if (diag["no_background"]) sprintf("%d file(s) had no UNCLUSTERED traces to use as the time reference", diag["no_background"]),
+        if (diag["too_small"])     sprintf("%d structure(s) had fewer than %d traces", diag["too_small"], min_n))
+      showNotification(
+        HTML(paste0("<b>No structures to plot.</b><br>",
+                    if (length(why)) paste(why, collapse = "<br>") else
+                      "No qualifying Median Cluster structures found.")),
+        type = "warning", duration = 12)
+      crowd_results(NULL); crowd_null_stats(NULL); return()
+    }
+    # ── attach the null band + the global trend test ──────────────────────────
+    tst <- crowding_null_test(res, if (do_null && length(null_rows)) do.call(rbind, null_rows) else NULL)
+    res <- tst$res
+    crowd_null_stats(tst$stats)
+
+    crowd_results(res)
+    ns <- crowd_null_stats()
     showNotification(
-      HTML(paste0("<b>No structures to plot.</b><br>",
-                  if (length(why)) paste(why, collapse = "<br>") else
-                    "No qualifying Median Cluster structures found.")),
-      type = "warning", duration = 12)
-    crowd_results(NULL); crowd_null_stats(NULL); return()
-  }
-  # ── attach the null band + the global trend test ──────────────────────────
-  tst <- crowding_null_test(res, if (do_null && length(null_rows)) do.call(rbind, null_rows) else NULL)
-  res <- tst$res
-  crowd_null_stats(tst$stats)
-
-  crowd_results(res)
-  ns <- crowd_null_stats()
-  showNotification(
-    sprintf("Crowding vs detection-time shift: %d structures across %d file(s).%s",
-            nrow(res), length(unique(res$dataset)),
-            if (!is.null(ns) && is.finite(ns$p))
-              sprintf(" Trend vs no-crowding null: rho = %.3f, p = %.3f (%d permutations).",
-                      ns$rho_obs, ns$p, ns$B) else ""),
-    type = "message", duration = 6)
+      sprintf("Crowding vs detection-time shift: %d structures across %d file(s).%s",
+              nrow(res), length(unique(res$dataset)),
+              if (!is.null(ns) && is.finite(ns$p))
+                sprintf(" Trend vs no-crowding null: rho = %.3f, p = %.3f (%d permutations).",
+                        ns$rho_obs, ns$p, ns$B) else ""),
+      type = "message", duration = 6)
+  })
 })
 
 build_crowd_plot_fig <- function() {

@@ -30,131 +30,133 @@ ripley_params      <- reactiveVal(NULL)   # compute settings, frozen at Run
 ripley_env_results <- reactiveVal(NULL)  # Monte-Carlo CSR envelope (per dataset)
 
 observeEvent(input$run_ripley, {
-  unit      <- resolve_unit(input$ripley_unit, "cluster", "tid", "Ripley's L")
-  use_3d    <- isTRUE(input$ripley_use_3d)
-  r_max_in  <- as.numeric(input$ripley_r_max  %||% 0)
-  r_steps   <- max(10L, as.integer(input$ripley_r_steps %||% 60L))
-  all_files <- isTRUE(input$ripley_all_files)
-  want_env  <- isTRUE(input$ripley_envelope)
-  nsim      <- max(19L, min(199L, as.integer(input$ripley_nsim %||% 99L)))
-  env_file_cap <- 6L  # cap envelope work in all-files mode (nsim × files is O(n²)-heavy)
+  with_analysis_seed(input$smlm_seed %||% SMLM_DEFAULTS$smlm_seed, {   # reproducible random draws (R/trk_settings.R)
+    unit      <- resolve_unit(input$ripley_unit, "cluster", "tid", "Ripley's L")
+    use_3d    <- isTRUE(input$ripley_use_3d)
+    r_max_in  <- as.numeric(input$ripley_r_max  %||% 0)
+    r_steps   <- max(10L, as.integer(input$ripley_r_steps %||% 60L))
+    all_files <- isTRUE(input$ripley_all_files)
+    want_env  <- isTRUE(input$ripley_envelope)
+    nsim      <- max(19L, min(199L, as.integer(input$ripley_nsim %||% 99L)))
+    env_file_cap <- 6L  # cap envelope work in all-files mode (nsim × files is O(n²)-heavy)
 
-  needs_cluster <- unit == "cluster"
+    needs_cluster <- unit == "cluster"
 
-  compute_ripley_for_df <- function(df, tag, r_seq_use, do_env, close_nm = NULL,
-                                    win_df = NULL, win_tag = NULL) {
-    pts <- unit_centroids(df, unit = unit, use_3d = use_3d)
-    if (is.null(pts) || nrow(pts) < 2L) return(NULL)
-    # THE WINDOW COMES FROM win_df, NOT FROM pts. Normally they are the same
-    # frame. They differ when this file has been split into channels: there
-    # win_df is the pooled file, so both channels are measured in one window
-    # (see split_df_by_channel). Deriving it from the channel's own points
-    # would shrink the window around the sparser channel and deflate its curve.
-    wdf  <- if (is.data.frame(win_df) && nrow(win_df)) win_df else df
-    wpts <- if (identical(wdf, df)) pts else unit_centroids(wdf, unit = unit, use_3d = use_3d)
-    if (is.null(wpts) || !nrow(wpts)) wpts <- pts
-    axes <- if (use_3d) c("x", "y", "z") else c("x", "y")
-    win  <- apply(as.matrix(wpts[, axes, drop = FALSE]), 2, range)
-    # Support window (opt-in), keyed on win_tag so channels of one file share a
-    # single cached support. Same shared choice of outline points as the
-    # hotspot panel, so one cell gets one area whichever panel measured it.
-    sup  <- spatial_support_of(spatial_outline_pts(wdf, wpts), use_3d,
-                               tag = win_tag %||% tag, close_nm = close_nm)
-    spatial_curve_for_points(pts, win, estimator = "L", r_seq = r_seq_use,
-                             use_3d = use_3d, support = sup,
-                             edge_correct = isTRUE(input$spatial_edge_correct),
-                             envelope = do_env, nsim = nsim, progress = env_prog, tag = tag)
-  }
-
-  get_df_list <- function() {
-    if (all_files) {
-      store <- smlm_file_store()
-      shiny::validate(shiny::need(length(store) > 0, "No files loaded."))
-      # Prepare each FILE once, then split it into channels if asked. Splitting
-      # after preparation (rather than handing the pipeline pre-split raw data,
-      # as this used to) is what lets both channels keep the pooled file as
-      # their shared observation window - and it means the split now covers a
-      # 2-colour DCR split as well as a multiplex build.
-      items <- lapply(names(store), function(nm) {
-        # Cached chain. NOTE this also brings run_ripley in line with every other
-        # panel by applying qc_exclude_from, which it previously skipped (a no-op
-        # unless 'Exclude flagged traces' is on).
-        df <- prepared_df(nm, needs_cluster = needs_cluster)
-        if (is.null(df)) df <- store[[nm]][0, , drop = FALSE]
-        list(df = df, tag = nm)
-      })
-      if (isTRUE(input$ripley_by_channel))
-        items <- unlist(lapply(items, function(it) split_df_by_channel(it$df, it$tag)),
-                        recursive = FALSE)
-      else
-        items <- lapply(items, function(it) c(it, list(win_df = it$df, win_tag = it$tag)))
-      items
-    } else {
-      df <- plottable_data()
-      shiny::validate(shiny::need(!is.null(df) && nrow(df) > 0, "Press Plot first."))
-      nm <- input$active_file %||% "Active file"
-      if (isTRUE(input$ripley_by_channel)) split_df_by_channel(df, nm)
-      else list(list(df = df, tag = nm, win_df = df, win_tag = nm))
+    compute_ripley_for_df <- function(df, tag, r_seq_use, do_env, close_nm = NULL,
+                                      win_df = NULL, win_tag = NULL) {
+      pts <- unit_centroids(df, unit = unit, use_3d = use_3d)
+      if (is.null(pts) || nrow(pts) < 2L) return(NULL)
+      # THE WINDOW COMES FROM win_df, NOT FROM pts. Normally they are the same
+      # frame. They differ when this file has been split into channels: there
+      # win_df is the pooled file, so both channels are measured in one window
+      # (see split_df_by_channel). Deriving it from the channel's own points
+      # would shrink the window around the sparser channel and deflate its curve.
+      wdf  <- if (is.data.frame(win_df) && nrow(win_df)) win_df else df
+      wpts <- if (identical(wdf, df)) pts else unit_centroids(wdf, unit = unit, use_3d = use_3d)
+      if (is.null(wpts) || !nrow(wpts)) wpts <- pts
+      axes <- if (use_3d) c("x", "y", "z") else c("x", "y")
+      win  <- apply(as.matrix(wpts[, axes, drop = FALSE]), 2, range)
+      # Support window (opt-in), keyed on win_tag so channels of one file share a
+      # single cached support. Same shared choice of outline points as the
+      # hotspot panel, so one cell gets one area whichever panel measured it.
+      sup  <- spatial_support_of(spatial_outline_pts(wdf, wpts), use_3d,
+                                 tag = win_tag %||% tag, close_nm = close_nm)
+      spatial_curve_for_points(pts, win, estimator = "L", r_seq = r_seq_use,
+                               use_3d = use_3d, support = sup,
+                               edge_correct = isTRUE(input$spatial_edge_correct),
+                               envelope = do_env, nsim = nsim, progress = env_prog, tag = tag)
     }
-  }
 
-  df_list <- get_df_list()
+    get_df_list <- function() {
+      if (all_files) {
+        store <- smlm_file_store()
+        shiny::validate(shiny::need(length(store) > 0, "No files loaded."))
+        # Prepare each FILE once, then split it into channels if asked. Splitting
+        # after preparation (rather than handing the pipeline pre-split raw data,
+        # as this used to) is what lets both channels keep the pooled file as
+        # their shared observation window - and it means the split now covers a
+        # 2-colour DCR split as well as a multiplex build.
+        items <- lapply(names(store), function(nm) {
+          # Cached chain. NOTE this also brings run_ripley in line with every other
+          # panel by applying qc_exclude_from, which it previously skipped (a no-op
+          # unless 'Exclude flagged traces' is on).
+          df <- prepared_df(nm, needs_cluster = needs_cluster)
+          if (is.null(df)) df <- store[[nm]][0, , drop = FALSE]
+          list(df = df, tag = nm)
+        })
+        if (isTRUE(input$ripley_by_channel))
+          items <- unlist(lapply(items, function(it) split_df_by_channel(it$df, it$tag)),
+                          recursive = FALSE)
+        else
+          items <- lapply(items, function(it) c(it, list(win_df = it$df, win_tag = it$tag)))
+        items
+      } else {
+        df <- plottable_data()
+        shiny::validate(shiny::need(!is.null(df) && nrow(df) > 0, "Press Plot first."))
+        nm <- input$active_file %||% "Active file"
+        if (isTRUE(input$ripley_by_channel)) split_df_by_channel(df, nm)
+        else list(list(df = df, tag = nm, win_df = df, win_tag = nm))
+      }
+    }
 
-  # One gap-fill radius for the whole set (see spatial_resolve_close()): a
-  # per-file radius makes the windows - and therefore K, which scales with the
-  # window area - incomparable between files. Never blocks.
-  # The sweep runs on the same points the window will be drawn from.
-  cc <- spatial_gate_close(lapply(df_list, function(it) {
-    u <- tryCatch(unit_centroids(it$df, unit = unit, use_3d = use_3d), error = function(e) NULL)
-    list(df = spatial_outline_pts(it$df, u), tag = it$tag)
-  }), use_3d)
-  common_close <- cc$close_nm
+    df_list <- get_df_list()
 
-  if (want_env && length(df_list) > env_file_cap) {
-    showNotification(sprintf(
-      "CSR envelope computed for the first %d of %d files only (cost is nsim × files).",
-      env_file_cap, length(df_list)), type = "message")
-  }
+    # One gap-fill radius for the whole set (see spatial_resolve_close()): a
+    # per-file radius makes the windows - and therefore K, which scales with the
+    # window area - incomparable between files. Never blocks.
+    # The sweep runs on the same points the window will be drawn from.
+    cc <- spatial_gate_close(lapply(df_list, function(it) {
+      u <- tryCatch(unit_centroids(it$df, unit = unit, use_3d = use_3d), error = function(e) NULL)
+      list(df = spatial_outline_pts(it$df, u), tag = it$tag)
+    }), use_3d)
+    common_close <- cc$close_nm
 
-  # The envelope dominates the runtime, so the bar advances per SIMULATION.
-  n_env_files <- if (want_env) min(length(df_list), env_file_cap) else 0L
-  env_prog <- if (want_env)
-    function(frac) incProgress(frac / max(1L, n_env_files)) else NULL
+    if (want_env && length(df_list) > env_file_cap) {
+      showNotification(sprintf(
+        "CSR envelope computed for the first %d of %d files only (cost is nsim × files).",
+        env_file_cap, length(df_list)), type = "message")
+    }
 
-  run_all <- function() {
-    lapply(seq_along(df_list), function(i) {
-      item      <- df_list[[i]]
-      r_seq_use <- if (r_max_in > 0) seq(0, r_max_in, length.out = r_steps + 1L)[-1] else NULL
-      do_env    <- want_env && i <= env_file_cap
-      compute_ripley_for_df(item$df, item$tag, r_seq_use, do_env, common_close,
-                            win_df = item$win_df, win_tag = item$win_tag)
-    })
-  }
-  all_out <- if (want_env) {
-    withProgress(message = sprintf("Ripley L: %d CSR simulations x %d file(s)...",
-                                   nsim, n_env_files), value = 0, run_all())
-  } else {
-    # Without an envelope there is no per-simulation tick, but building the
-    # windows still takes seconds - show a bar rather than appear frozen.
-    withProgress(message = sprintf("Ripley L: %d file(s)...", length(df_list)),
-                 value = 0.5, run_all())
-  }
-  spatial_report_windows(vapply(df_list, function(it) as.character(it$tag), character(1)))
+    # The envelope dominates the runtime, so the bar advances per SIMULATION.
+    n_env_files <- if (want_env) min(length(df_list), env_file_cap) else 0L
+    env_prog <- if (want_env)
+      function(frac) incProgress(frac / max(1L, n_env_files)) else NULL
 
-  all_out    <- Filter(Negate(is.null), all_out)
-  all_curves <- do.call(rbind, lapply(all_out, `[[`, "curve"))
-  shiny::validate(shiny::need(!is.null(all_curves) && nrow(all_curves) > 0, "Ripley computation returned no data."))
-  ripley_results(all_curves)
-  ripley_params(list(unit = input$ripley_unit, `r max` = input$ripley_r_max,
-                     `r steps` = input$ripley_r_steps, `3-D` = use_3d,
-                     `all files` = all_files, envelope = want_env,
-                     simulations = input$ripley_nsim,
-                     `edge correction` = isTRUE(input$spatial_edge_correct),
-                     `support window` = isTRUE(input$spatial_use_support)))
+    run_all <- function() {
+      lapply(seq_along(df_list), function(i) {
+        item      <- df_list[[i]]
+        r_seq_use <- if (r_max_in > 0) seq(0, r_max_in, length.out = r_steps + 1L)[-1] else NULL
+        do_env    <- want_env && i <= env_file_cap
+        compute_ripley_for_df(item$df, item$tag, r_seq_use, do_env, common_close,
+                              win_df = item$win_df, win_tag = item$win_tag)
+      })
+    }
+    all_out <- if (want_env) {
+      withProgress(message = sprintf("Ripley L: %d CSR simulations x %d file(s)...",
+                                     nsim, n_env_files), value = 0, run_all())
+    } else {
+      # Without an envelope there is no per-simulation tick, but building the
+      # windows still takes seconds - show a bar rather than appear frozen.
+      withProgress(message = sprintf("Ripley L: %d file(s)...", length(df_list)),
+                   value = 0.5, run_all())
+    }
+    spatial_report_windows(vapply(df_list, function(it) as.character(it$tag), character(1)))
 
-  envs <- Filter(Negate(is.null), lapply(all_out, `[[`, "env"))
-  ripley_env_results(if (length(envs)) do.call(rbind, envs) else NULL)
+    all_out    <- Filter(Negate(is.null), all_out)
+    all_curves <- do.call(rbind, lapply(all_out, `[[`, "curve"))
+    shiny::validate(shiny::need(!is.null(all_curves) && nrow(all_curves) > 0, "Ripley computation returned no data."))
+    ripley_results(all_curves)
+    ripley_params(list(unit = input$ripley_unit, `r max` = input$ripley_r_max,
+                       `r steps` = input$ripley_r_steps, `3-D` = use_3d,
+                       `all files` = all_files, envelope = want_env,
+                       simulations = input$ripley_nsim,
+                       `edge correction` = isTRUE(input$spatial_edge_correct),
+                       `support window` = isTRUE(input$spatial_use_support)))
 
+    envs <- Filter(Negate(is.null), lapply(all_out, `[[`, "env"))
+    ripley_env_results(if (length(envs)) do.call(rbind, envs) else NULL)
+
+  })
 })
 
 build_ripley_plot_fig <- function() {
@@ -415,113 +417,115 @@ pcf_params      <- reactiveVal(NULL)   # compute settings, frozen at Run
 pcf_env_results <- reactiveVal(NULL)
 
 observeEvent(input$run_pcf, {
-  unit      <- resolve_unit(input$pcf_unit, "cluster", "tid", "g(r)")
-  use_3d    <- isTRUE(input$pcf_use_3d)
-  r_max_in  <- as.numeric(input$pcf_r_max %||% 0)
-  r_steps   <- max(10L, as.integer(input$pcf_r_steps %||% 50L))
-  all_files <- isTRUE(input$pcf_all_files)
-  want_env  <- isTRUE(input$pcf_envelope)
-  nsim      <- max(19L, min(199L, as.integer(input$pcf_nsim %||% 99L)))
-  env_file_cap <- 6L
+  with_analysis_seed(input$smlm_seed %||% SMLM_DEFAULTS$smlm_seed, {   # reproducible random draws (R/trk_settings.R)
+    unit      <- resolve_unit(input$pcf_unit, "cluster", "tid", "g(r)")
+    use_3d    <- isTRUE(input$pcf_use_3d)
+    r_max_in  <- as.numeric(input$pcf_r_max %||% 0)
+    r_steps   <- max(10L, as.integer(input$pcf_r_steps %||% 50L))
+    all_files <- isTRUE(input$pcf_all_files)
+    want_env  <- isTRUE(input$pcf_envelope)
+    nsim      <- max(19L, min(199L, as.integer(input$pcf_nsim %||% 99L)))
+    env_file_cap <- 6L
 
-  needs_cluster <- unit == "cluster"
+    needs_cluster <- unit == "cluster"
 
-  compute_for_df <- function(df, tag, r_seq_use, do_env, close_nm = NULL,
-                             win_df = NULL, win_tag = NULL) {
-    pts <- unit_centroids(df, unit = unit, use_3d = use_3d)
-    if (is.null(pts) || nrow(pts) < 3L) return(NULL)
-    # Window from win_df, not from pts - see compute_ripley_for_df(). When this
-    # file is split into channels, win_df is the pooled file so both channels
-    # are measured in one window; g(r) divides by density, so a per-channel
-    # window would invent a difference out of the count imbalance alone.
-    wdf  <- if (is.data.frame(win_df) && nrow(win_df)) win_df else df
-    wpts <- if (identical(wdf, df)) pts else unit_centroids(wdf, unit = unit, use_3d = use_3d)
-    if (is.null(wpts) || !nrow(wpts)) wpts <- pts
-    # Freeze the window so the curve and its envelope share one window and the
-    # (uncorrected) edge bias cancels between them.
-    axes <- if (use_3d) c("x", "y", "z") else c("x", "y")
-    win  <- apply(as.matrix(wpts[, axes, drop = FALSE]), 2, range)
-    # Same shared choice of outline points as the hotspot panel, so one cell
-    # gets one area whichever panel measured it.
-    sup  <- spatial_support_of(spatial_outline_pts(wdf, wpts), use_3d,
-                               tag = win_tag %||% tag, close_nm = close_nm)
-    spatial_curve_for_points(pts, win, estimator = "g", r_seq = r_seq_use,
-                             use_3d = use_3d, support = sup,
-                             edge_correct = isTRUE(input$spatial_edge_correct),
-                             envelope = do_env, nsim = nsim, progress = env_prog, tag = tag)
-  }
-
-  get_df_list <- function() {
-    if (all_files) {
-      store <- smlm_file_store()
-      shiny::validate(shiny::need(length(store) > 0, "No files loaded."))
-      # Prepare each FILE once, then split into channels - so both channels
-      # share the pooled file as their observation window.
-      items <- lapply(names(store), function(nm) {
-        df <- prepared_df(nm, needs_cluster = needs_cluster)
-        if (is.null(df)) df <- store[[nm]][0, , drop = FALSE]
-        list(df = df, tag = nm)
-      })
-      if (isTRUE(input$pcf_by_channel))
-        unlist(lapply(items, function(it) split_df_by_channel(it$df, it$tag)),
-               recursive = FALSE)
-      else
-        lapply(items, function(it) c(it, list(win_df = it$df, win_tag = it$tag)))
-    } else {
-      df <- plottable_data()
-      shiny::validate(shiny::need(!is.null(df) && nrow(df) > 0, "Press Plot first."))
-      nm <- input$active_file %||% "Active file"
-      if (isTRUE(input$pcf_by_channel)) split_df_by_channel(df, nm)
-      else list(list(df = df, tag = nm, win_df = df, win_tag = nm))
+    compute_for_df <- function(df, tag, r_seq_use, do_env, close_nm = NULL,
+                               win_df = NULL, win_tag = NULL) {
+      pts <- unit_centroids(df, unit = unit, use_3d = use_3d)
+      if (is.null(pts) || nrow(pts) < 3L) return(NULL)
+      # Window from win_df, not from pts - see compute_ripley_for_df(). When this
+      # file is split into channels, win_df is the pooled file so both channels
+      # are measured in one window; g(r) divides by density, so a per-channel
+      # window would invent a difference out of the count imbalance alone.
+      wdf  <- if (is.data.frame(win_df) && nrow(win_df)) win_df else df
+      wpts <- if (identical(wdf, df)) pts else unit_centroids(wdf, unit = unit, use_3d = use_3d)
+      if (is.null(wpts) || !nrow(wpts)) wpts <- pts
+      # Freeze the window so the curve and its envelope share one window and the
+      # (uncorrected) edge bias cancels between them.
+      axes <- if (use_3d) c("x", "y", "z") else c("x", "y")
+      win  <- apply(as.matrix(wpts[, axes, drop = FALSE]), 2, range)
+      # Same shared choice of outline points as the hotspot panel, so one cell
+      # gets one area whichever panel measured it.
+      sup  <- spatial_support_of(spatial_outline_pts(wdf, wpts), use_3d,
+                                 tag = win_tag %||% tag, close_nm = close_nm)
+      spatial_curve_for_points(pts, win, estimator = "g", r_seq = r_seq_use,
+                               use_3d = use_3d, support = sup,
+                               edge_correct = isTRUE(input$spatial_edge_correct),
+                               envelope = do_env, nsim = nsim, progress = env_prog, tag = tag)
     }
-  }
 
-  df_list <- get_df_list()
+    get_df_list <- function() {
+      if (all_files) {
+        store <- smlm_file_store()
+        shiny::validate(shiny::need(length(store) > 0, "No files loaded."))
+        # Prepare each FILE once, then split into channels - so both channels
+        # share the pooled file as their observation window.
+        items <- lapply(names(store), function(nm) {
+          df <- prepared_df(nm, needs_cluster = needs_cluster)
+          if (is.null(df)) df <- store[[nm]][0, , drop = FALSE]
+          list(df = df, tag = nm)
+        })
+        if (isTRUE(input$pcf_by_channel))
+          unlist(lapply(items, function(it) split_df_by_channel(it$df, it$tag)),
+                 recursive = FALSE)
+        else
+          lapply(items, function(it) c(it, list(win_df = it$df, win_tag = it$tag)))
+      } else {
+        df <- plottable_data()
+        shiny::validate(shiny::need(!is.null(df) && nrow(df) > 0, "Press Plot first."))
+        nm <- input$active_file %||% "Active file"
+        if (isTRUE(input$pcf_by_channel)) split_df_by_channel(df, nm)
+        else list(list(df = df, tag = nm, win_df = df, win_tag = nm))
+      }
+    }
 
-  # One gap-fill radius for the whole set (see spatial_resolve_close()), swept on
-  # the same points the window will be drawn from.
-  cc <- spatial_gate_close(lapply(df_list, function(it) {
-    u <- tryCatch(unit_centroids(it$df, unit = unit, use_3d = use_3d),
-                  error = function(e) NULL)
-    list(df = spatial_outline_pts(it$df, u), tag = it$tag)
-  }), use_3d)
-  common_close <- cc$close_nm
+    df_list <- get_df_list()
 
-  if (want_env && length(df_list) > env_file_cap)
-    showNotification(sprintf(
-      "CSR envelope computed for the first %d of %d files only (cost is simulations x files).",
-      env_file_cap, length(df_list)), type = "message")
+    # One gap-fill radius for the whole set (see spatial_resolve_close()), swept on
+    # the same points the window will be drawn from.
+    cc <- spatial_gate_close(lapply(df_list, function(it) {
+      u <- tryCatch(unit_centroids(it$df, unit = unit, use_3d = use_3d),
+                    error = function(e) NULL)
+      list(df = spatial_outline_pts(it$df, u), tag = it$tag)
+    }), use_3d)
+    common_close <- cc$close_nm
 
-  n_env_files <- if (want_env) min(length(df_list), env_file_cap) else 0L
-  env_prog <- if (want_env)
-    function(frac) incProgress(frac / max(1L, n_env_files)) else NULL
+    if (want_env && length(df_list) > env_file_cap)
+      showNotification(sprintf(
+        "CSR envelope computed for the first %d of %d files only (cost is simulations x files).",
+        env_file_cap, length(df_list)), type = "message")
 
-  run_all <- function() lapply(seq_along(df_list), function(i) {
-    r_seq_use <- if (r_max_in > 0) seq(0, r_max_in, length.out = r_steps) else NULL
-    compute_for_df(df_list[[i]]$df, df_list[[i]]$tag, r_seq_use,
-                   want_env && i <= env_file_cap, common_close,
-                   win_df = df_list[[i]]$win_df, win_tag = df_list[[i]]$win_tag)
+    n_env_files <- if (want_env) min(length(df_list), env_file_cap) else 0L
+    env_prog <- if (want_env)
+      function(frac) incProgress(frac / max(1L, n_env_files)) else NULL
+
+    run_all <- function() lapply(seq_along(df_list), function(i) {
+      r_seq_use <- if (r_max_in > 0) seq(0, r_max_in, length.out = r_steps) else NULL
+      compute_for_df(df_list[[i]]$df, df_list[[i]]$tag, r_seq_use,
+                     want_env && i <= env_file_cap, common_close,
+                     win_df = df_list[[i]]$win_df, win_tag = df_list[[i]]$win_tag)
+    })
+    all_out <- if (want_env) withProgress(
+                 message = sprintf("g(r): %d CSR simulations x %d file(s)...", nsim, n_env_files),
+                 value = 0, run_all())
+               else withProgress(message = sprintf("g(r): %d file(s)...", length(df_list)),
+                                 value = 0.5, run_all())
+    spatial_report_windows(vapply(df_list, function(it) as.character(it$tag), character(1)))
+
+    all_out <- Filter(Negate(is.null), all_out)
+    curves  <- do.call(rbind, lapply(all_out, `[[`, "curve"))
+    shiny::validate(shiny::need(!is.null(curves) && nrow(curves) > 0,
+                               "g(r) returned no data (need >=3 units per file)."))
+    pcf_results(curves)
+    pcf_params(list(unit = input$pcf_unit, `r max` = input$pcf_r_max,
+                    `r steps` = input$pcf_r_steps, `3-D` = use_3d,
+                    `all files` = all_files, envelope = want_env,
+                    simulations = input$pcf_nsim,
+                    `edge correction` = isTRUE(input$spatial_edge_correct),
+                    `support window` = isTRUE(input$spatial_use_support)))
+    envs <- Filter(Negate(is.null), lapply(all_out, `[[`, "env"))
+    pcf_env_results(if (length(envs)) do.call(rbind, envs) else NULL)
   })
-  all_out <- if (want_env) withProgress(
-               message = sprintf("g(r): %d CSR simulations x %d file(s)...", nsim, n_env_files),
-               value = 0, run_all())
-             else withProgress(message = sprintf("g(r): %d file(s)...", length(df_list)),
-                               value = 0.5, run_all())
-  spatial_report_windows(vapply(df_list, function(it) as.character(it$tag), character(1)))
-
-  all_out <- Filter(Negate(is.null), all_out)
-  curves  <- do.call(rbind, lapply(all_out, `[[`, "curve"))
-  shiny::validate(shiny::need(!is.null(curves) && nrow(curves) > 0,
-                             "g(r) returned no data (need >=3 units per file)."))
-  pcf_results(curves)
-  pcf_params(list(unit = input$pcf_unit, `r max` = input$pcf_r_max,
-                  `r steps` = input$pcf_r_steps, `3-D` = use_3d,
-                  `all files` = all_files, envelope = want_env,
-                  simulations = input$pcf_nsim,
-                  `edge correction` = isTRUE(input$spatial_edge_correct),
-                  `support window` = isTRUE(input$spatial_use_support)))
-  envs <- Filter(Negate(is.null), lapply(all_out, `[[`, "env"))
-  pcf_env_results(if (length(envs)) do.call(rbind, envs) else NULL)
 })
 
 # ── Correlation length xi, one row per curve ──────────────────────────────

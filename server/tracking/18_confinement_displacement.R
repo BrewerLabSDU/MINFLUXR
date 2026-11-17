@@ -53,106 +53,108 @@
 # CI is weak for DIRECTED motion (a modest drift barely lifts the late/early ratio) -
 # use Directionality or Speed & Transport for transport.
 conf_ci_bundle <- eventReactive(input$trk_conf_ci_run, {
-  td <- tryCatch(trk_unified_tdiff(), error = function(e) NULL)
-  shiny::validate(shiny::need(!is.null(td) && !is.null(td$pertrack) && nrow(td$pertrack) > 0,
-    "Run the MSD first (Plot MSD) - the confinement index comes from the per-track MSD."))
-  pt <- td$pertrack
-  pt <- pt[is.finite(pt$conf_index), , drop = FALSE]
-  shiny::validate(shiny::need(nrow(pt) >= 5L, "Too few tracks with a usable confinement index."))
+  with_analysis_seed(input$trk_seed %||% TRK_DEFAULTS$trk_seed, {   # reproducible random draws (R/trk_settings.R)
+    td <- tryCatch(trk_unified_tdiff(), error = function(e) NULL)
+    shiny::validate(shiny::need(!is.null(td) && !is.null(td$pertrack) && nrow(td$pertrack) > 0,
+      "Run the MSD first (Plot MSD) - the confinement index comes from the per-track MSD."))
+    pt <- td$pertrack
+    pt <- pt[is.finite(pt$conf_index), , drop = FALSE]
+    shiny::validate(shiny::need(nrow(pt) >= 5L, "Too few tracks with a usable confinement index."))
 
-  df  <- trk(); t_c <- tryCatch(trk_cycle_time(), error = function(e) NA_real_)
-  shiny::validate(shiny::need(is.finite(t_c) && t_c > 0, "Cycle time unknown."))
-  ub  <- tryCatch(msd_unified_bundle(), error = function(e) NULL)
-  ndim <- if (!is.null(ub)) ub$ndim else 2L
-  sig <- tryCatch(trk_sigma_loc_eff(), error = function(e) NA_real_)
-  if (!is.finite(sig) || sig < 0) sig <- 0
-  b   <- tryCatch(trk_cve_bundle(), error = function(e) NULL)
-  D_use <- if (!is.null(b) && is.finite(b$D_cve) && b$D_cve > 0) b$D_cve else {
-    dm <- stats::median(pt$D_um2_s[is.finite(pt$D_um2_s) & pt$D_um2_s > 0], na.rm = TRUE)
-    if (is.finite(dm)) dm * 1e3 else NA_real_
-  }
-  shiny::validate(shiny::need(is.finite(D_use) && D_use > 0,
-    "Need a D - run Data Quality & Calibration, or the MSD."))
+    df  <- trk(); t_c <- tryCatch(trk_cycle_time(), error = function(e) NA_real_)
+    shiny::validate(shiny::need(is.finite(t_c) && t_c > 0, "Cycle time unknown."))
+    ub  <- tryCatch(msd_unified_bundle(), error = function(e) NULL)
+    ndim <- if (!is.null(ub)) ub$ndim else 2L
+    sig <- tryCatch(trk_sigma_loc_eff(), error = function(e) NA_real_)
+    if (!is.finite(sig) || sig < 0) sig <- 0
+    b   <- tryCatch(trk_cve_bundle(), error = function(e) NULL)
+    D_use <- if (!is.null(b) && is.finite(b$D_cve) && b$D_cve > 0) b$D_cve else {
+      dm <- stats::median(pt$D_um2_s[is.finite(pt$D_um2_s) & pt$D_um2_s > 0], na.rm = TRUE)
+      if (is.finite(dm)) dm * 1e3 else NA_real_
+    }
+    shiny::validate(shiny::need(is.finite(D_use) && D_use > 0,
+      "Need a D - run Data Quality & Calibration, or the MSD."))
 
-  # Per-track localization count and the dataset's real dark-gap distribution, so the
-  # null tracks are sampled exactly like the data.
-  npts <- table(df$tid)
-  pt$n_loc <- as.integer(npts[as.character(pt$tid)])
-  pt <- pt[is.finite(pt$n_loc) & pt$n_loc >= 5L, , drop = FALSE]
-  shiny::validate(shiny::need(nrow(pt) >= 5L, "Too few tracks after matching localization counts."))
-  d2 <- df[order(df$tid, df$tim), ]
-  same <- c(FALSE, d2$tid[-1] == d2$tid[-nrow(d2)])
-  kk <- pmax(1L, as.integer(round(c(NA, diff(d2$tim))[same] / t_c)))
-  kk <- kk[is.finite(kk) & kk >= 1L]
-  gap_p <- if (length(kk) > 50L) { tb <- tabulate(pmin(kk, 15L), nbins = 15L); tb / sum(tb) }
-           else c(0.55, 0.22, 0.09, 0.05, 0.04, 0.05)
+    # Per-track localization count and the dataset's real dark-gap distribution, so the
+    # null tracks are sampled exactly like the data.
+    npts <- table(df$tid)
+    pt$n_loc <- as.integer(npts[as.character(pt$tid)])
+    pt <- pt[is.finite(pt$n_loc) & pt$n_loc >= 5L, , drop = FALSE]
+    shiny::validate(shiny::need(nrow(pt) >= 5L, "Too few tracks after matching localization counts."))
+    d2 <- df[order(df$tid, df$tim), ]
+    same <- c(FALSE, d2$tid[-1] == d2$tid[-nrow(d2)])
+    kk <- pmax(1L, as.integer(round(c(NA, diff(d2$tim))[same] / t_c)))
+    kk <- kk[is.finite(kk) & kk >= 1L]
+    gap_p <- if (length(kk) > 50L) { tb <- tabulate(pmin(kk, 15L), nbins = 15L); tb / sum(tb) }
+             else c(0.55, 0.22, 0.09, 0.05, 0.04, 0.05)
 
-  min_lag <- max(1L, as.integer(input$trk_uni_min_lag %||% TRK_DEFAULTS$trk_uni_min_lag))
-  max_lag <- max(min_lag + 2L, as.integer(input$trk_uni_max_lag %||% TRK_DEFAULTS$trk_uni_max_lag))
-  Ns <- pt$n_loc
-  grid <- if (length(unique(Ns)) <= 8L) sort(unique(Ns))
-          else sort(unique(pmax(5L, round(stats::quantile(Ns, seq(0, 1, length.out = 8L),
-                                                          names = FALSE)))))
-  nsim <- max(50L, min(500L, as.integer(input$trk_conf_ci_nsim %||% TRK_DEFAULTS$trk_conf_ci_nsim)))
+    min_lag <- max(1L, as.integer(input$trk_uni_min_lag %||% TRK_DEFAULTS$trk_uni_min_lag))
+    max_lag <- max(min_lag + 2L, as.integer(input$trk_uni_max_lag %||% TRK_DEFAULTS$trk_uni_max_lag))
+    Ns <- pt$n_loc
+    grid <- if (length(unique(Ns)) <= 8L) sort(unique(Ns))
+            else sort(unique(pmax(5L, round(stats::quantile(Ns, seq(0, 1, length.out = 8L),
+                                                            names = FALSE)))))
+    nsim <- max(50L, min(500L, as.integer(input$trk_conf_ci_nsim %||% TRK_DEFAULTS$trk_conf_ci_nsim)))
 
-  # ── D grid ────────────────────────────────────────────────────────────────
-  # The free CI depends on x = σ_loc²/(D·t_c), so the null is matched on each
-  # track's OWN D as well as its length - otherwise the slow half of a
-  # heterogeneous population is measured against a null built for the fast half and
-  # comes out "confined". The grid collapses to a single point (the cheap path, and
-  # identical to matching on N alone) when that dependence cannot bite: either the
-  # noise is negligible at the fastest tracks, or the per-track D barely varies.
-  Dtr <- pt$D_um2_s * 1e3                       # per-track D, nm²/ms
-  ok_D <- is.finite(Dtr) & Dtr > 0
-  Dtr[!ok_D] <- D_use
-  x_of <- function(D) if (sig > 0) sig^2 / (D * t_c) else 0
-  D_rng <- if (any(ok_D)) stats::quantile(Dtr[ok_D], c(0.05, 0.95), names = FALSE)
-           else c(D_use, D_use)
-  needs_D_grid <- sig > 0 && is.finite(D_rng[1]) && D_rng[1] > 0 &&
-                  x_of(D_rng[2]) > 0.3 &&        # noise matters somewhere
-                  (D_rng[2] / D_rng[1]) > 2      # and D actually varies
-  D_grid <- if (needs_D_grid)
-              exp(seq(log(D_rng[1]), log(D_rng[2]), length.out = 4L))
-            else D_use
-  ncell <- length(grid) * length(D_grid)
-  # Noise for the null: when σ_loc comes from the photon model, resample the
-  # per-localization values (the MSD offset is set by mean σ², which a long-tailed
-  # photon count pushes above median σ²). A manual or CVE/MSD σ stays static.
-  sig_null <- if (identical(trk_sigma_loc_src(), "photon budget") && !is.null(b) &&
-                  sum(is.finite(b$sig_phot)) >= 50L) b$sig_phot[is.finite(b$sig_phot)]
-              else sig
-  # The simulation is ~85% of the wait, so it owns 0 -> 0.85 of the bar and the
-  # per-track matching that follows owns the rest. sim_free_ci_null() reports a
-  # CUMULATIVE fraction, so it is set, not added: incrementing would run the bar
-  # to 100% at the end of the simulation and leave the matching looking hung.
-  nul <- withProgress(message = "Confinement: simulating the free null…", value = 0,
-    sim_free_ci_null(grid, D_grid = D_grid, n_sim = nsim, t_c = t_c, sigma = sig_null,
-                     ndim = ndim, gap_p = gap_p, min_lag = min_lag, max_lag = max_lag,
-                     progress = function(f) setProgress(0.85 * f,
-                       detail = sprintf("%d of %d (length, D) cells", round(f * ncell), ncell)),
-                     R_blur = trk_blur()$R_msd))   # same blur coefficient as the MSD fits
-  # nearest cell in (log N, log D)
-  idx <- withProgress(message = "Confinement: matching tracks to the null…", value = 0.85, {
-    ln <- log(nul$n); lD <- log(nul$D)
-    vapply(seq_len(nrow(pt)), function(i) {
-      which.min((ln - log(Ns[i]))^2 + (lD - log(Dtr[i]))^2)
-    }, integer(1))
+    # ── D grid ────────────────────────────────────────────────────────────────
+    # The free CI depends on x = σ_loc²/(D·t_c), so the null is matched on each
+    # track's OWN D as well as its length - otherwise the slow half of a
+    # heterogeneous population is measured against a null built for the fast half and
+    # comes out "confined". The grid collapses to a single point (the cheap path, and
+    # identical to matching on N alone) when that dependence cannot bite: either the
+    # noise is negligible at the fastest tracks, or the per-track D barely varies.
+    Dtr <- pt$D_um2_s * 1e3                       # per-track D, nm²/ms
+    ok_D <- is.finite(Dtr) & Dtr > 0
+    Dtr[!ok_D] <- D_use
+    x_of <- function(D) if (sig > 0) sig^2 / (D * t_c) else 0
+    D_rng <- if (any(ok_D)) stats::quantile(Dtr[ok_D], c(0.05, 0.95), names = FALSE)
+             else c(D_use, D_use)
+    needs_D_grid <- sig > 0 && is.finite(D_rng[1]) && D_rng[1] > 0 &&
+                    x_of(D_rng[2]) > 0.3 &&        # noise matters somewhere
+                    (D_rng[2] / D_rng[1]) > 2      # and D actually varies
+    D_grid <- if (needs_D_grid)
+                exp(seq(log(D_rng[1]), log(D_rng[2]), length.out = 4L))
+              else D_use
+    ncell <- length(grid) * length(D_grid)
+    # Noise for the null: when σ_loc comes from the photon model, resample the
+    # per-localization values (the MSD offset is set by mean σ², which a long-tailed
+    # photon count pushes above median σ²). A manual or CVE/MSD σ stays static.
+    sig_null <- if (identical(trk_sigma_loc_src(), "photon budget") && !is.null(b) &&
+                    sum(is.finite(b$sig_phot)) >= 50L) b$sig_phot[is.finite(b$sig_phot)]
+                else sig
+    # The simulation is ~85% of the wait, so it owns 0 -> 0.85 of the bar and the
+    # per-track matching that follows owns the rest. sim_free_ci_null() reports a
+    # CUMULATIVE fraction, so it is set, not added: incrementing would run the bar
+    # to 100% at the end of the simulation and leave the matching looking hung.
+    nul <- withProgress(message = "Confinement: simulating the free null…", value = 0,
+      sim_free_ci_null(grid, D_grid = D_grid, n_sim = nsim, t_c = t_c, sigma = sig_null,
+                       ndim = ndim, gap_p = gap_p, min_lag = min_lag, max_lag = max_lag,
+                       progress = function(f) setProgress(0.85 * f,
+                         detail = sprintf("%d of %d (length, D) cells", round(f * ncell), ncell)),
+                       R_blur = trk_blur()$R_msd))   # same blur coefficient as the MSD fits
+    # nearest cell in (log N, log D)
+    idx <- withProgress(message = "Confinement: matching tracks to the null…", value = 0.85, {
+      ln <- log(nul$n); lD <- log(nul$D)
+      vapply(seq_len(nrow(pt)), function(i) {
+        which.min((ln - log(Ns[i]))^2 + (lD - log(Dtr[i]))^2)
+      }, integer(1))
+    })
+    pt$null_D  <- nul$D[idx]
+    pt$ci_lo05 <- nul$lo05[idx]; pt$ci_med <- nul$med[idx]; pt$ci_hi95 <- nul$hi95[idx]
+    pt$ci_class <- ifelse(pt$conf_index < pt$ci_lo05, "confined",
+                   ifelse(pt$conf_index > pt$ci_hi95, "directed", "free-like"))
+    # Resolution floor: how far a free molecule travels over the median track duration.
+    durs <- tapply(df$tim, df$tid, function(v) diff(range(v)))
+    T_med <- stats::median(as.numeric(durs), na.rm = TRUE)
+    attr(pt, "resolv") <- sqrt(2 * ndim * D_use * T_med)
+    attr(pt, "D_use") <- D_use; attr(pt, "sigma") <- sig
+    attr(pt, "T_med") <- T_med; attr(pt, "null") <- nul; attr(pt, "nsim") <- nsim
+    attr(pt, "D_matched") <- length(D_grid) > 1L
+    attr(pt, "x_noise") <- x_of(D_use)
+    attr(pt, "sigma_info") <- .sigma_stamp(sig, note = if (length(sig_null) > 1L)
+      "the null resamples the per-localization photon values" else NULL)
+    pt
   })
-  pt$null_D  <- nul$D[idx]
-  pt$ci_lo05 <- nul$lo05[idx]; pt$ci_med <- nul$med[idx]; pt$ci_hi95 <- nul$hi95[idx]
-  pt$ci_class <- ifelse(pt$conf_index < pt$ci_lo05, "confined",
-                 ifelse(pt$conf_index > pt$ci_hi95, "directed", "free-like"))
-  # Resolution floor: how far a free molecule travels over the median track duration.
-  durs <- tapply(df$tim, df$tid, function(v) diff(range(v)))
-  T_med <- stats::median(as.numeric(durs), na.rm = TRUE)
-  attr(pt, "resolv") <- sqrt(2 * ndim * D_use * T_med)
-  attr(pt, "D_use") <- D_use; attr(pt, "sigma") <- sig
-  attr(pt, "T_med") <- T_med; attr(pt, "null") <- nul; attr(pt, "nsim") <- nsim
-  attr(pt, "D_matched") <- length(D_grid) > 1L
-  attr(pt, "x_noise") <- x_of(D_use)
-  attr(pt, "sigma_info") <- .sigma_stamp(sig, note = if (length(sig_null) > 1L)
-    "the null resamples the per-localization photon values" else NULL)
-  pt
 })
 
 output$trk_conf_ci_summary <- renderUI({
@@ -409,84 +411,86 @@ output$trk_disp_geom_echo <- renderUI({
 # closed-surface band diverges only where finite size + curvature bite. Same physics as
 # the Diffusion Simulator.
 trk_disp_geom_null <- reactive({
-  if (!isTRUE(input$trk_disp_geom)) return(NULL)
-  res <- trk_disp_bundle(); req(nrow(res) > 0)
-  D_use <- attr(res, "D_use")
-  geom  <- .geom_for_null(input$trk_geom_type %||% TRK_DEFAULTS$trk_geom_type)
-  params <- list(
-    R    = max(1, as.numeric(input$trk_disp_R    %||% TRK_DEFAULTS$trk_disp_R)),
-    r    = max(1, as.numeric(input$trk_disp_r    %||% TRK_DEFAULTS$trk_disp_r)),
-    Lcyl = max(1, as.numeric(input$trk_disp_L    %||% TRK_DEFAULTS$trk_disp_L)),
-    a    = max(1, as.numeric(input$trk_disp_a    %||% TRK_DEFAULTS$trk_disp_a)),
-    b    = max(1, as.numeric(input$trk_disp_b    %||% TRK_DEFAULTS$trk_disp_b)),
-    c    = max(1, as.numeric(input$trk_disp_c    %||% TRK_DEFAULTS$trk_disp_c)),
-    mtilt = max(0, as.numeric(input$trk_disp_mtilt %||% TRK_DEFAULTS$trk_disp_mtilt)))
-  cyc   <- tryCatch(isolate(trk_cycle_time()), error = function(e) NA_real_)
-  if (!is.finite(cyc) || cyc <= 0) cyc <- stats::median(diff(sort(res$dur_ms))) # crude fallback
-  if (!is.finite(cyc) || cyc <= 0) return(NULL)
-  # Match the real DURATION distribution (R_net depends on T) over its FULL range.
-  # This used to be truncated at the 98th percentile to bound the per-cycle loop, which
-  # left the longest tracks - the ones carrying the most information about confinement -
-  # judged against a flat-extrapolated band. Cost scales with the number of simulation
-  # steps (longest duration / step), so instead of dropping those tracks the SIMULATION
-  # STEP is coarsened: Brownian statistics are step-size invariant, so a larger step with
-  # SD = √(2·D·dt) gives the same R_net distribution provided the step stays small
-  # compared with the geometry. Measured on a rod (r = 400 nm, D = 200 nm²/ms): stepping
-  # at 1×/5×/10×/25× the cycle gave median R_net 292/305/306/302 nm and p95 753/782/787/786
-  # while the run time fell from 2.6 s to 0.09 s.
-  # Simulate on a LOG-SPACED GRID spanning the observed durations, with replicates at
-  # each point, rather than resampling the empirical durations. Resampling plus
-  # equal-count binning put the last bin's MEDIAN far below the longest track, so the
-  # band visibly stopped short of the data and the few longest tracks - the most
-  # informative ones - were classified against a flat extrapolation. On a grid the
-  # band is defined at the maximum duration by construction.
-  dv <- res$dur_ms[is.finite(res$dur_ms) & res$dur_ms > 0]
-  if (!length(dv)) return(NULL)
-  d_rng <- range(dv)
-  if (d_rng[1] <= 0 || !is.finite(d_rng[2])) return(NULL)
-  n_grid_t <- 24L; n_rep <- 200L
-  grid_t <- if (d_rng[2] / d_rng[1] > 1.05)
-              exp(seq(log(d_rng[1]), log(d_rng[2]), length.out = n_grid_t))
-            else rep(d_rng[2], 1L)
-  durs  <- rep(grid_t, each = n_rep)
-  T_max <- max(durs, na.rm = TRUE)
-  step_budget <- 4000L
-  dt_sim <- max(cyc, T_max / step_budget)
-  # Keep the step well below the smallest geometry dimension, or the tangent-step-and-
-  # reproject operator loses accuracy. Unbounded shapes have no such limit.
-  gmin <- switch(geom, sphere = params$R, rod = params$r,
-                 ellipsoid = min(params$a, params$b, params$c), Inf)
-  if (is.finite(gmin) && gmin > 0 && is.finite(D_use) && D_use > 0) {
-    dt_geom <- (0.05 * gmin)^2 / (2 * D_use)     # step SD ≤ 5% of the smallest dimension
-    dt_sim  <- min(dt_sim, max(cyc, dt_geom))
-  }
-  # 2D data → simulate the 3D geometry and PROJECT (the cell is 3D even if tracking is 2D);
-  # 3D data → keep all three axes.
-  proj2d <- (attr(res, "d_obs") %||% 2L) == 2L
-  # Same "Molecule moves" choice that sets the Step-1 degrees of freedom.
-  # "surface" and "filament" both mean the molecule is on the boundary; only a
-  # volume-filling molecule reflects around inside it.
-  gmode  <- if (identical(input$trk_motion %||% TRK_DEFAULTS$trk_motion, "volume")) "volume" else "surface"
-  rnet <- withProgress(message = "Simulating free-on-geometry null…", value = 0.4,
-                       sim_free_geom_rnet(durs, D_use, geom, params, dt_sim, proj2d = proj2d,
-                                          mode = gmode))
-  if (!length(rnet)) return(NULL)
-  D_surf <- attr(rnet, "D_surf") %||% D_use
-  # One 5/50/95 summary per grid duration - the band therefore spans the full range of
-  # observed track durations, ending exactly at the longest track.
-  rs  <- as.numeric(rnet)
-  gid <- rep(seq_along(grid_t), each = n_rep)[seq_along(rs)]
-  bt  <- grid_t[sort(unique(gid))]
-  blo <- as.numeric(tapply(rs, gid, stats::quantile, 0.05))
-  bmd <- as.numeric(tapply(rs, gid, stats::quantile, 0.50))
-  bhi <- as.numeric(tapply(rs, gid, stats::quantile, 0.95))
-  # Classify each REAL track against the geometry null at its own duration.
-  lo_r <- stats::approx(bt, blo, xout = res$dur_ms, rule = 2)$y
-  hi_r <- stats::approx(bt, bhi, xout = res$dur_ms, rule = 2)$y
-  gclass <- ifelse(res$Rnet_nm < lo_r, "confined",
-            ifelse(res$Rnet_nm > hi_r, "directed", "free-on-geometry"))
-  list(bt = bt, blo = blo, bmd = bmd, bhi = bhi, gclass = gclass, D_surf = D_surf,
-       geom = geom, dims = .disp_geom_dims(geom, params), cyc = cyc, gmode = gmode)
+  with_analysis_seed(input$trk_seed %||% TRK_DEFAULTS$trk_seed, {   # reproducible random draws (R/trk_settings.R)
+    if (!isTRUE(input$trk_disp_geom)) return(NULL)
+    res <- trk_disp_bundle(); req(nrow(res) > 0)
+    D_use <- attr(res, "D_use")
+    geom  <- .geom_for_null(input$trk_geom_type %||% TRK_DEFAULTS$trk_geom_type)
+    params <- list(
+      R    = max(1, as.numeric(input$trk_disp_R    %||% TRK_DEFAULTS$trk_disp_R)),
+      r    = max(1, as.numeric(input$trk_disp_r    %||% TRK_DEFAULTS$trk_disp_r)),
+      Lcyl = max(1, as.numeric(input$trk_disp_L    %||% TRK_DEFAULTS$trk_disp_L)),
+      a    = max(1, as.numeric(input$trk_disp_a    %||% TRK_DEFAULTS$trk_disp_a)),
+      b    = max(1, as.numeric(input$trk_disp_b    %||% TRK_DEFAULTS$trk_disp_b)),
+      c    = max(1, as.numeric(input$trk_disp_c    %||% TRK_DEFAULTS$trk_disp_c)),
+      mtilt = max(0, as.numeric(input$trk_disp_mtilt %||% TRK_DEFAULTS$trk_disp_mtilt)))
+    cyc   <- tryCatch(isolate(trk_cycle_time()), error = function(e) NA_real_)
+    if (!is.finite(cyc) || cyc <= 0) cyc <- stats::median(diff(sort(res$dur_ms))) # crude fallback
+    if (!is.finite(cyc) || cyc <= 0) return(NULL)
+    # Match the real DURATION distribution (R_net depends on T) over its FULL range.
+    # This used to be truncated at the 98th percentile to bound the per-cycle loop, which
+    # left the longest tracks - the ones carrying the most information about confinement -
+    # judged against a flat-extrapolated band. Cost scales with the number of simulation
+    # steps (longest duration / step), so instead of dropping those tracks the SIMULATION
+    # STEP is coarsened: Brownian statistics are step-size invariant, so a larger step with
+    # SD = √(2·D·dt) gives the same R_net distribution provided the step stays small
+    # compared with the geometry. Measured on a rod (r = 400 nm, D = 200 nm²/ms): stepping
+    # at 1×/5×/10×/25× the cycle gave median R_net 292/305/306/302 nm and p95 753/782/787/786
+    # while the run time fell from 2.6 s to 0.09 s.
+    # Simulate on a LOG-SPACED GRID spanning the observed durations, with replicates at
+    # each point, rather than resampling the empirical durations. Resampling plus
+    # equal-count binning put the last bin's MEDIAN far below the longest track, so the
+    # band visibly stopped short of the data and the few longest tracks - the most
+    # informative ones - were classified against a flat extrapolation. On a grid the
+    # band is defined at the maximum duration by construction.
+    dv <- res$dur_ms[is.finite(res$dur_ms) & res$dur_ms > 0]
+    if (!length(dv)) return(NULL)
+    d_rng <- range(dv)
+    if (d_rng[1] <= 0 || !is.finite(d_rng[2])) return(NULL)
+    n_grid_t <- 24L; n_rep <- 200L
+    grid_t <- if (d_rng[2] / d_rng[1] > 1.05)
+                exp(seq(log(d_rng[1]), log(d_rng[2]), length.out = n_grid_t))
+              else rep(d_rng[2], 1L)
+    durs  <- rep(grid_t, each = n_rep)
+    T_max <- max(durs, na.rm = TRUE)
+    step_budget <- 4000L
+    dt_sim <- max(cyc, T_max / step_budget)
+    # Keep the step well below the smallest geometry dimension, or the tangent-step-and-
+    # reproject operator loses accuracy. Unbounded shapes have no such limit.
+    gmin <- switch(geom, sphere = params$R, rod = params$r,
+                   ellipsoid = min(params$a, params$b, params$c), Inf)
+    if (is.finite(gmin) && gmin > 0 && is.finite(D_use) && D_use > 0) {
+      dt_geom <- (0.05 * gmin)^2 / (2 * D_use)     # step SD ≤ 5% of the smallest dimension
+      dt_sim  <- min(dt_sim, max(cyc, dt_geom))
+    }
+    # 2D data → simulate the 3D geometry and PROJECT (the cell is 3D even if tracking is 2D);
+    # 3D data → keep all three axes.
+    proj2d <- (attr(res, "d_obs") %||% 2L) == 2L
+    # Same "Molecule moves" choice that sets the Step-1 degrees of freedom.
+    # "surface" and "filament" both mean the molecule is on the boundary; only a
+    # volume-filling molecule reflects around inside it.
+    gmode  <- if (identical(input$trk_motion %||% TRK_DEFAULTS$trk_motion, "volume")) "volume" else "surface"
+    rnet <- withProgress(message = "Simulating free-on-geometry null…", value = 0.4,
+                         sim_free_geom_rnet(durs, D_use, geom, params, dt_sim, proj2d = proj2d,
+                                            mode = gmode))
+    if (!length(rnet)) return(NULL)
+    D_surf <- attr(rnet, "D_surf") %||% D_use
+    # One 5/50/95 summary per grid duration - the band therefore spans the full range of
+    # observed track durations, ending exactly at the longest track.
+    rs  <- as.numeric(rnet)
+    gid <- rep(seq_along(grid_t), each = n_rep)[seq_along(rs)]
+    bt  <- grid_t[sort(unique(gid))]
+    blo <- as.numeric(tapply(rs, gid, stats::quantile, 0.05))
+    bmd <- as.numeric(tapply(rs, gid, stats::quantile, 0.50))
+    bhi <- as.numeric(tapply(rs, gid, stats::quantile, 0.95))
+    # Classify each REAL track against the geometry null at its own duration.
+    lo_r <- stats::approx(bt, blo, xout = res$dur_ms, rule = 2)$y
+    hi_r <- stats::approx(bt, bhi, xout = res$dur_ms, rule = 2)$y
+    gclass <- ifelse(res$Rnet_nm < lo_r, "confined",
+              ifelse(res$Rnet_nm > hi_r, "directed", "free-on-geometry"))
+    list(bt = bt, blo = blo, bmd = bmd, bhi = bhi, gclass = gclass, D_surf = D_surf,
+         geom = geom, dims = .disp_geom_dims(geom, params), cyc = cyc, gmode = gmode)
+  })
 })
 
 

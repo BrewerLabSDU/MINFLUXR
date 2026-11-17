@@ -55,115 +55,117 @@ spatial_outline_pts <- function(locs_df, unit_pts) {
 
 
 observeEvent(input$run_hotspot, {
-  unit    <- resolve_unit(input$hot_unit, "cluster", "tid", "Local density & hotspots")
-  ulab    <- hotspot_unit_label(unit)
-  use_3d  <- isTRUE(input$hot_use_3d)
-  k       <- max(1L, as.integer(input$hot_k %||% 5L))
-  quad    <- max(10, as.numeric(input$hot_quadrat %||% 250))
-  thresh  <- max(1, as.numeric(input$hot_enh_thresh %||% 5))
-  minpts  <- max(2L, as.integer(input$hot_minpts %||% 5L))
-  target  <- min(0.5, max(0.001, as.numeric(input$hot_target_frac %||% 0.05)))
-  nsim    <- max(3L, as.integer(input$hot_nsim %||% 15L))
-  # The window is NOT this panel's to define. Pitch, closing radius and estimator
-  # mode all come from "Density & area normalization", so this panel measures the
-  # same cell area that Ripley's L and g(r) measure. See spatial_window_of().
-  h_nm    <- max(10, as.numeric(input$dens_grid_h %||% 100))
-  needs_cluster <- unit == "cluster"
+  with_analysis_seed(input$smlm_seed %||% SMLM_DEFAULTS$smlm_seed, {   # reproducible random draws (R/trk_settings.R)
+    unit    <- resolve_unit(input$hot_unit, "cluster", "tid", "Local density & hotspots")
+    ulab    <- hotspot_unit_label(unit)
+    use_3d  <- isTRUE(input$hot_use_3d)
+    k       <- max(1L, as.integer(input$hot_k %||% 5L))
+    quad    <- max(10, as.numeric(input$hot_quadrat %||% 250))
+    thresh  <- max(1, as.numeric(input$hot_enh_thresh %||% 5))
+    minpts  <- max(2L, as.integer(input$hot_minpts %||% 5L))
+    target  <- min(0.5, max(0.001, as.numeric(input$hot_target_frac %||% 0.05)))
+    nsim    <- max(3L, as.integer(input$hot_nsim %||% 15L))
+    # The window is NOT this panel's to define. Pitch, closing radius and estimator
+    # mode all come from "Density & area normalization", so this panel measures the
+    # same cell area that Ripley's L and g(r) measure. See spatial_window_of().
+    h_nm    <- max(10, as.numeric(input$dens_grid_h %||% 100))
+    needs_cluster <- unit == "cluster"
 
-  store <- smlm_file_store()
-  shiny::validate(shiny::need(length(store) > 0, "No files loaded."))
+    store <- smlm_file_store()
+    shiny::validate(shiny::need(length(store) > 0, "No files loaded."))
 
-  # ---- 1. prepare every file, then take one point per unit -------------------
-  items <- lapply(names(store), function(nm) {
-    df <- prepared_df(nm, needs_cluster = needs_cluster)
-    if (is.null(df) || !nrow(df)) return(NULL)
-    pts <- unit_centroids(df, unit = unit, use_3d = use_3d)
-    if (is.null(pts) || nrow(pts) < max(3L, minpts)) return(NULL)
-    list(tag = nm, df = df, pts = pts)
-  })
-  items <- Filter(Negate(is.null), items)
-  shiny::validate(shiny::need(length(items) > 0,
-    "No file had enough units. Check the filters, or lower minPts."))
-
-  # ---- 2. ONE gap-fill radius for the whole set -----------------------------
-  # Shared, for the same reason the curve panels share theirs: the footprint sets
-  # the area, the area sets the density, and a per-file radius would put each
-  # cell on its own density scale - which is precisely the comparison this panel
-  # exists to make. Resolved on the UNIT positions (not the raw localizations),
-  # because the units are what the density is measured on.
-  # THE FOOTPRINT MUST NOT BE BUILT FROM THE UNITS, so the sweep runs on every
-  # LOCALIZATION, exactly as the curve panels and the density panel do. The
-  # support is a property of where signal was detected; estimating it from unit
-  # centroids makes the area depend on the unit count, which is the very thing
-  # being normalised out. Measured (see compute_unit_density): two synthetic
-  # cells with identical geometry and a 4x labelling difference gave
-  # centroid-based supports of 5.01e6 against 3.82e6 nm^2, turning a true 4.0x
-  # density ratio into 3.05x.
-  cc <- spatial_gate_close(lapply(items, function(it)
-          list(df = spatial_outline_pts(it$df, it$pts), tag = it$tag)),
-          use_3d, force = TRUE, h_nm = h_nm)
-  close_nm <- if (!is.null(cc$close_nm) && is.finite(cc$close_nm)) cc$close_nm else
-    max(0, as.numeric(input$dens_close_nm %||% 200))
-
-  # ---- 3. per file: footprint -> enhancement -> calibrated eps -> foci -------
-  out <- withProgress(message = sprintf("Local density: %d file(s)...", length(items)),
-                      value = 0, {
-    lapply(seq_along(items), function(i) {
-      it <- items[[i]]
-      incProgress(1 / length(items), detail = it$tag)
-      # The SAME call the curve panels make, on the SAME point set (all
-      # localizations - see the note on the radius above), so the window is
-      # logged once and the "these files were not measured the same way" check
-      # covers this panel too. The unit centroids are what the STATISTICS run
-      # on; they are not what defines the cell.
-      sup <- tryCatch(spatial_support_of(spatial_outline_pts(it$df, it$pts),
-                                         use_3d, tag = it$tag,
-                                         close_nm = close_nm, force = TRUE),
-                      error = function(e) NULL)
-      hotspot_for_points(it$pts, support = sup, k = k, quadrat_nm = quad,
-                         enh_thresh = thresh, minPts = minpts, target_frac = target,
-                         nsim = nsim, use_3d = use_3d, tag = it$tag)
+    # ---- 1. prepare every file, then take one point per unit -------------------
+    items <- lapply(names(store), function(nm) {
+      df <- prepared_df(nm, needs_cluster = needs_cluster)
+      if (is.null(df) || !nrow(df)) return(NULL)
+      pts <- unit_centroids(df, unit = unit, use_3d = use_3d)
+      if (is.null(pts) || nrow(pts) < max(3L, minpts)) return(NULL)
+      list(tag = nm, df = df, pts = pts)
     })
+    items <- Filter(Negate(is.null), items)
+    shiny::validate(shiny::need(length(items) > 0,
+      "No file had enough units. Check the filters, or lower minPts."))
+
+    # ---- 2. ONE gap-fill radius for the whole set -----------------------------
+    # Shared, for the same reason the curve panels share theirs: the footprint sets
+    # the area, the area sets the density, and a per-file radius would put each
+    # cell on its own density scale - which is precisely the comparison this panel
+    # exists to make. Resolved on the UNIT positions (not the raw localizations),
+    # because the units are what the density is measured on.
+    # THE FOOTPRINT MUST NOT BE BUILT FROM THE UNITS, so the sweep runs on every
+    # LOCALIZATION, exactly as the curve panels and the density panel do. The
+    # support is a property of where signal was detected; estimating it from unit
+    # centroids makes the area depend on the unit count, which is the very thing
+    # being normalised out. Measured (see compute_unit_density): two synthetic
+    # cells with identical geometry and a 4x labelling difference gave
+    # centroid-based supports of 5.01e6 against 3.82e6 nm^2, turning a true 4.0x
+    # density ratio into 3.05x.
+    cc <- spatial_gate_close(lapply(items, function(it)
+            list(df = spatial_outline_pts(it$df, it$pts), tag = it$tag)),
+            use_3d, force = TRUE, h_nm = h_nm)
+    close_nm <- if (!is.null(cc$close_nm) && is.finite(cc$close_nm)) cc$close_nm else
+      max(0, as.numeric(input$dens_close_nm %||% 200))
+
+    # ---- 3. per file: footprint -> enhancement -> calibrated eps -> foci -------
+    out <- withProgress(message = sprintf("Local density: %d file(s)...", length(items)),
+                        value = 0, {
+      lapply(seq_along(items), function(i) {
+        it <- items[[i]]
+        incProgress(1 / length(items), detail = it$tag)
+        # The SAME call the curve panels make, on the SAME point set (all
+        # localizations - see the note on the radius above), so the window is
+        # logged once and the "these files were not measured the same way" check
+        # covers this panel too. The unit centroids are what the STATISTICS run
+        # on; they are not what defines the cell.
+        sup <- tryCatch(spatial_support_of(spatial_outline_pts(it$df, it$pts),
+                                           use_3d, tag = it$tag,
+                                           close_nm = close_nm, force = TRUE),
+                        error = function(e) NULL)
+        hotspot_for_points(it$pts, support = sup, k = k, quadrat_nm = quad,
+                           enh_thresh = thresh, minPts = minpts, target_frac = target,
+                           nsim = nsim, use_3d = use_3d, tag = it$tag)
+      })
+    })
+    out <- Filter(Negate(is.null), out)
+    shiny::validate(shiny::need(length(out) > 0, "Local density returned no data."))
+    names(out) <- vapply(out, function(o) o$tag, character(1))
+
+    rows <- do.call(rbind, lapply(out, `[[`, "row"))
+    rows$close_nm <- close_nm
+    hotspot_rows(rows)
+    hotspot_unit(unit)
+    hotspot_detail(out)
+    hotspot_params(list(unit = input$hot_unit, k = input$hot_k,
+                        `quadrat (nm)` = input$hot_quadrat,
+                        `enhancement threshold` = input$hot_enh_thresh,
+                        minPts = input$hot_minpts,
+                        `false-cluster target` = input$hot_target_frac,
+                        `CSR draws` = input$hot_nsim,
+                        `3-D` = use_3d))
+
+    # The map file picker only ever offers files that actually produced a result.
+    spatial_report_windows(vapply(items, function(it) as.character(it$tag),
+                                  character(1)))
+
+    updateSelectInput(session, "hot_map_file", choices = names(out),
+                      selected = if (!is.null(input$hot_map_file) &&
+                                     input$hot_map_file %in% names(out))
+                        input$hot_map_file else names(out)[1])
+
+    # A bounding-box window makes every number here a per-FRAME density rather than
+    # a per-CELL one, which is a different quantity, not a noisier version of the
+    # same one. It happens two ways: the estimator mode is set to bbox or hull (no
+    # mask), or the footprint guard rejected the window for that file.
+    fb <- rows$dataset[grepl("bbox", rows$window_mode %||% "", fixed = TRUE)]
+    if (length(fb) == nrow(rows))
+      showNotification(HTML(sprintf(
+        "<b>Every window is a bounding box</b>, so densities are per imaged frame, not per cell. Set the estimator to <b>grid</b> or <b>kde</b> under Density &amp; area normalization. (%s)",
+        rows$window_mode[1])), type = "warning", duration = NULL)
+    else if (length(fb))
+      showNotification(HTML(sprintf(
+        "<b>No footprint for %s.</b> Those files fell back to the bounding box and are not on the same scale as the rest. Raise the gap-fill radius or check the support map.",
+        paste(utils::head(fb, 4), collapse = ", "))), type = "warning", duration = NULL)
   })
-  out <- Filter(Negate(is.null), out)
-  shiny::validate(shiny::need(length(out) > 0, "Local density returned no data."))
-  names(out) <- vapply(out, function(o) o$tag, character(1))
-
-  rows <- do.call(rbind, lapply(out, `[[`, "row"))
-  rows$close_nm <- close_nm
-  hotspot_rows(rows)
-  hotspot_unit(unit)
-  hotspot_detail(out)
-  hotspot_params(list(unit = input$hot_unit, k = input$hot_k,
-                      `quadrat (nm)` = input$hot_quadrat,
-                      `enhancement threshold` = input$hot_enh_thresh,
-                      minPts = input$hot_minpts,
-                      `false-cluster target` = input$hot_target_frac,
-                      `CSR draws` = input$hot_nsim,
-                      `3-D` = use_3d))
-
-  # The map file picker only ever offers files that actually produced a result.
-  spatial_report_windows(vapply(items, function(it) as.character(it$tag),
-                                character(1)))
-
-  updateSelectInput(session, "hot_map_file", choices = names(out),
-                    selected = if (!is.null(input$hot_map_file) &&
-                                   input$hot_map_file %in% names(out))
-                      input$hot_map_file else names(out)[1])
-
-  # A bounding-box window makes every number here a per-FRAME density rather than
-  # a per-CELL one, which is a different quantity, not a noisier version of the
-  # same one. It happens two ways: the estimator mode is set to bbox or hull (no
-  # mask), or the footprint guard rejected the window for that file.
-  fb <- rows$dataset[grepl("bbox", rows$window_mode %||% "", fixed = TRUE)]
-  if (length(fb) == nrow(rows))
-    showNotification(HTML(sprintf(
-      "<b>Every window is a bounding box</b>, so densities are per imaged frame, not per cell. Set the estimator to <b>grid</b> or <b>kde</b> under Density &amp; area normalization. (%s)",
-      rows$window_mode[1])), type = "warning", duration = NULL)
-  else if (length(fb))
-    showNotification(HTML(sprintf(
-      "<b>No footprint for %s.</b> Those files fell back to the bounding box and are not on the same scale as the rest. Raise the gap-fill radius or check the support map.",
-      paste(utils::head(fb, 4), collapse = ", "))), type = "warning", duration = NULL)
 })
 
 output$hotspot_stale <- renderUI(.stale_badge(

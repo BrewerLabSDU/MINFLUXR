@@ -108,7 +108,13 @@ SMLM_SETTINGS_SPEC <- list(
   fid_exclude      = .ss(FALSE, "flag", "gates"),
   dens_norm_enable = .ss(FALSE, "flag", "gates"),
   dens_thin_enable = .ss(FALSE, "flag", "gates"),
-  dens_norm_unit   = .ss("auto", "choice", "gates", choices = c("auto", "cluster", "tid"))
+  dens_norm_unit   = .ss("auto", "choice", "gates", choices = c("auto", "cluster", "tid")),
+
+  # ── Reproducibility. Seed of every random draw in the tab's analyses (CSR and
+  #    shift envelopes, the co-localization and crowding nulls, the hotspot
+  #    calibration, subsampling). Each Run starts from it, so a result does not
+  #    depend on what ran before. NA = draw a fresh seed each Run.
+  smlm_seed        = .ss(1L, "int", "reproducibility", min = 0, na_ok = TRUE)
 )
 rm(.ss)
 
