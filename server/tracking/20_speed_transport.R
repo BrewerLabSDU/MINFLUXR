@@ -20,7 +20,7 @@
 # (> 0), else the app-wide value (unified MSD / manual), else 0. Keeps the drift
 # noise floor √2σ/W and the α de-bias consistent with the rest of the app.
 trk_speed_sigma_eff <- reactive({
-  v <- suppressWarnings(as.numeric(input$trk_speed_sigma_nm %||% 0))
+  v <- suppressWarnings(as.numeric(input$trk_speed_sigma_nm %||% TRK_DEFAULTS$trk_speed_sigma_nm))
   if (is.finite(v) && v > 0) return(v)
   s <- tryCatch(trk_sigma_loc_eff(), error = function(e) NA_real_)
   if (is.finite(s) && s > 0) s else 0
@@ -89,17 +89,17 @@ trk_speed_sigma_eff <- reactive({
 trk_export_summary <- eventReactive(input$trk_speed_run, {
   req(isTRUE(input$trk_show_speed))
   df <- trk(); req(nrow(df) > 0)
-  min_pts   <- max(5L, as.integer(input$trk_speed_min_pts %||% 20L))
-  smooth    <- as.integer(input$trk_speed_smooth %||% 5L)
-  drift_win <- as.numeric(input$trk_speed_drift_win %||% 200)
-  drift_mp  <- as.integer(input$trk_speed_drift_minpts %||% 5L)
+  min_pts   <- max(5L, as.integer(input$trk_speed_min_pts %||% TRK_DEFAULTS$trk_speed_min_pts))
+  smooth    <- as.integer(input$trk_speed_smooth %||% TRK_DEFAULTS$trk_speed_smooth)
+  drift_win <- as.numeric(input$trk_speed_drift_win %||% TRK_DEFAULTS$trk_speed_drift_win)
+  drift_mp  <- as.integer(input$trk_speed_drift_minpts %||% TRK_DEFAULTS$trk_speed_drift_minpts)
   sigma_nm  <- trk_speed_sigma_eff()
-  onset_thr <- as.numeric(input$trk_speed_onset_thr %||% 0)
-  fold      <- as.numeric(input$trk_speed_fold %||% 3)
-  min_run   <- max(1L, as.integer(input$trk_speed_min_run %||% 3L))
-  guard_win <- max(0, as.numeric(input$trk_speed_edge_guard %||% 1))
-  a_win     <- as.integer(input$trk_speed_alpha_win %||% 21L)
-  a_maxlag  <- as.integer(input$trk_speed_alpha_maxlag %||% 6L)
+  onset_thr <- as.numeric(input$trk_speed_onset_thr %||% TRK_DEFAULTS$trk_speed_onset_thr)
+  fold      <- as.numeric(input$trk_speed_fold %||% TRK_DEFAULTS$trk_speed_fold)
+  min_run   <- max(1L, as.integer(input$trk_speed_min_run %||% TRK_DEFAULTS$trk_speed_min_run))
+  guard_win <- max(0, as.numeric(input$trk_speed_edge_guard %||% TRK_DEFAULTS$trk_speed_edge_guard))
+  a_win     <- as.integer(input$trk_speed_alpha_win %||% TRK_DEFAULTS$trk_speed_alpha_win)
+  a_maxlag  <- as.integer(input$trk_speed_alpha_maxlag %||% TRK_DEFAULTS$trk_speed_alpha_maxlag)
   vfloor    <- if (is.finite(sigma_nm) && sigma_nm > 0 && drift_win > 0) sqrt(2) * sigma_nm / drift_win else 0
 
   counts <- table(df$tid); tids <- names(counts[counts >= min_pts])
@@ -216,7 +216,7 @@ trk_export_summary <- eventReactive(input$trk_speed_run, {
   }))
   out <- do.call(rbind, rows)
   shiny::validate(shiny::need(!is.null(out) && nrow(out) > 0, "No tracks produced a drift-velocity curve."))
-  v_panel <- suppressWarnings(as.numeric(input$trk_speed_sigma_nm %||% 0))
+  v_panel <- suppressWarnings(as.numeric(input$trk_speed_sigma_nm %||% TRK_DEFAULTS$trk_speed_sigma_nm))
   attr(out, "sigma_info") <- .sigma_stamp(if (sigma_nm > 0) sigma_nm else NA_real_, role = "noise floor",
     source = if (is.finite(v_panel) && v_panel > 0) "value entered in this panel" else NULL)
   out
@@ -244,8 +244,8 @@ output$trk_speed_plot <- renderPlotly({
   df <- trk(); req(nrow(df) > 0)
   dark <- isTRUE(isolate(input$trk_dark_mode))
   bg <- if (dark) "#000000" else "#FFFFFF"; fg <- if (dark) "#FFFFFF" else "#333333"
-  min_pts <- max(5L, as.integer(input$trk_speed_min_pts %||% 20L))
-  smooth  <- as.integer(input$trk_speed_smooth %||% 5L)
+  min_pts <- max(5L, as.integer(input$trk_speed_min_pts %||% TRK_DEFAULTS$trk_speed_min_pts))
+  smooth  <- as.integer(input$trk_speed_smooth %||% TRK_DEFAULTS$trk_speed_smooth)
   counts  <- table(df$tid); tids <- names(counts[counts >= min_pts])
   shiny::validate(shiny::need(length(tids) > 0, "No tracks with enough points - lower 'Min points per TID'."))
   tid_sel <- input$trk_speed_tid
@@ -255,13 +255,13 @@ output$trk_speed_plot <- renderPlotly({
   show_path  <- isTRUE(input$trk_speed_show_path  %||% TRUE)
   show_drift <- isTRUE(input$trk_speed_show_drift %||% TRUE)
   show_alpha <- isTRUE(input$trk_speed_show_alpha %||% TRUE)
-  drift_win  <- as.numeric(input$trk_speed_drift_win %||% 200)
-  drift_mp   <- as.integer(input$trk_speed_drift_minpts %||% 5L)
+  drift_win  <- as.numeric(input$trk_speed_drift_win %||% TRK_DEFAULTS$trk_speed_drift_win)
+  drift_mp   <- as.integer(input$trk_speed_drift_minpts %||% TRK_DEFAULTS$trk_speed_drift_minpts)
   sigma_nm   <- trk_speed_sigma_eff()
-  a_win      <- as.integer(input$trk_speed_alpha_win %||% 21L)
-  a_maxlag   <- as.integer(input$trk_speed_alpha_maxlag %||% 6L)
-  onset_thr  <- as.numeric(input$trk_speed_onset_thr %||% 0)
-  fold       <- as.numeric(input$trk_speed_fold %||% 3)
+  a_win      <- as.integer(input$trk_speed_alpha_win %||% TRK_DEFAULTS$trk_speed_alpha_win)
+  a_maxlag   <- as.integer(input$trk_speed_alpha_maxlag %||% TRK_DEFAULTS$trk_speed_alpha_maxlag)
+  onset_thr  <- as.numeric(input$trk_speed_onset_thr %||% TRK_DEFAULTS$trk_speed_onset_thr)
+  fold       <- as.numeric(input$trk_speed_fold %||% TRK_DEFAULTS$trk_speed_fold)
 
   fig <- plot_ly()
 
@@ -513,12 +513,12 @@ output$trk_dl_speed_csv <- downloadHandler(
   filename = function() paste0("speed_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv"),
   content  = function(file) {
     df <- tryCatch(trk(), error = function(e) NULL); req(!is.null(df))
-    min_pts   <- max(5L, as.integer(input$trk_speed_min_pts %||% 20L))
-    smooth    <- as.integer(input$trk_speed_smooth %||% 5L)
-    drift_win <- as.numeric(input$trk_speed_drift_win %||% 200)
-    drift_mp  <- as.integer(input$trk_speed_drift_minpts %||% 5L)
-    a_win     <- as.integer(input$trk_speed_alpha_win %||% 21L)
-    a_maxlag  <- as.integer(input$trk_speed_alpha_maxlag %||% 6L)
+    min_pts   <- max(5L, as.integer(input$trk_speed_min_pts %||% TRK_DEFAULTS$trk_speed_min_pts))
+    smooth    <- as.integer(input$trk_speed_smooth %||% TRK_DEFAULTS$trk_speed_smooth)
+    drift_win <- as.numeric(input$trk_speed_drift_win %||% TRK_DEFAULTS$trk_speed_drift_win)
+    drift_mp  <- as.integer(input$trk_speed_drift_minpts %||% TRK_DEFAULTS$trk_speed_drift_minpts)
+    a_win     <- as.integer(input$trk_speed_alpha_win %||% TRK_DEFAULTS$trk_speed_alpha_win)
+    a_maxlag  <- as.integer(input$trk_speed_alpha_maxlag %||% TRK_DEFAULTS$trk_speed_alpha_maxlag)
     sigma_nm  <- trk_speed_sigma_eff()
     counts  <- table(df$tid); tids <- names(counts[counts >= min_pts])
     # Long/tidy format: all three metrics stacked (they have different time bases).

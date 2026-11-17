@@ -94,7 +94,7 @@ cpd_segments_rv <- eventReactive(input$trk_cpd_compute, {
   req(!is.null(df), nrow(df) > 0,
       all(c("x","y","tid","tim") %in% names(df)))
 
-  min_seg    <- max(3L, as.integer(input$trk_cpd_min_seg %||% 8L))
+  min_seg    <- max(3L, as.integer(input$trk_cpd_min_seg %||% TRK_DEFAULTS$trk_cpd_min_seg))
   use_z_cpd  <- isTRUE(has_z())
   ndim       <- if (use_z_cpd) 3L else 2L
   coef_D     <- 2L * ndim   # 4 (2D) or 6 (3D): MSD = coef_D * D * dt
@@ -143,7 +143,7 @@ cpd_gmm_rv <- reactive({
   req(isTRUE(input$trk_show_cpd))
   segs <- tryCatch(cpd_segments_rv(), error = function(e) NULL)   # per-segment D values
   req(!is.null(segs), nrow(segs) >= 3L)
-  cpd_gmm(segs, max_G = input$trk_cpd_max_g %||% 4L)              # est_cpd.R
+  cpd_gmm(segs, max_G = input$trk_cpd_max_g %||% TRK_DEFAULTS$trk_cpd_max_g)              # est_cpd.R
 })
 
 output$trk_cpd_hist <- renderPlotly({

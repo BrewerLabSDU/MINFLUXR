@@ -638,7 +638,12 @@ tracking_ui <- fluidPage(
                            value = 0, min = 0, step = 0.5),
               helpText(style = "font-size:0.8em; color:#666; margin-top:-6px;",
                 "> 0 replaces the photon-budget ", sigloc(), " in every panel. For data without photon ",
-                "counts (no ECO column).")
+                "counts (no ECO column)."),
+              numericInput("trk_seed", "Random seed for the analyses",
+                           value = TRK_DEFAULTS$trk_seed, min = 0, step = 1),
+              helpText(style = "font-size:0.8em; color:#666; margin-top:-6px;",
+                "Bootstrap intervals and simulated nulls start from this seed on every Run, so a ",
+                "result can be reproduced from the settings file. Blank draws a new seed each Run.")
             )
           ),
           ),  # /Acquisition Parameters

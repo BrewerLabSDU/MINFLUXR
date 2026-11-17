@@ -405,12 +405,12 @@ observeEvent(input$trk_msd_sync_cycle, {
 
 
 .msd_d_eff <- function(d_obs) {
-  motion <- input$trk_motion %||% "volume"
+  motion <- input$trk_motion %||% TRK_DEFAULTS$trk_motion
   if (identical(motion, "volume")) return(as.numeric(d_obs))
   d_mot <- if (identical(motion, "filament")) 1 else 2
   if (d_obs >= 3L) return(d_mot)               # all coordinates recorded: no projection loss
   if (identical(motion, "filament")) return(1) # a track lying in the image plane
-  switch(input$trk_geom_type %||% "none",
+  switch(input$trk_geom_type %||% TRK_DEFAULTS$trk_geom_type,
          sphere = 4 / 3, ellipsoid = 4 / 3, rod = 3 / 2, membrane = 2, 2)
 }
 
@@ -423,12 +423,12 @@ msd_unified_bundle <- eventReactive(input$trk_msd_compute, {
   # Number of cycle-lags to compute = the requested upper fit limit (so the
   # confined-model plateau is reachable), floored at 60 and capped at 5000 to
   # avoid runaway. Re-click Plot MSD after changing the upper limit to recompute.
-  max_lag <- max(60L, min(5000L, as.integer(isolate(input$trk_uni_max_lag) %||% 50L)))
+  max_lag <- max(60L, min(5000L, as.integer(isolate(input$trk_uni_max_lag) %||% TRK_DEFAULTS$trk_uni_max_lag)))
   min_pts <- isolate(max(5L, as.integer(input$trk_msd_min_pts)))
 
   df <- isolate(trk()); req(nrow(df) > 0)
   # Dimensionality: honour the user's 2D/3D selector (auto = 3D only if z varies).
-  ndim_sel   <- isolate(input$trk_msd_ndim %||% "auto")
+  ndim_sel   <- isolate(input$trk_msd_ndim %||% TRK_DEFAULTS$trk_msd_ndim)
   has_z_auto <- .has_real_z(df)
   has_z <- if (identical(ndim_sel, "2")) FALSE
            else if (identical(ndim_sel, "3")) ("z" %in% names(df))
@@ -467,18 +467,18 @@ msd_geom_null <- reactive({
   ub <- tryCatch(msd_unified_bundle(), error = function(e) NULL); req(!is.null(ub))
   fr <- tryCatch(msd_unified_fit(ub), error = function(e) NULL)
   req(!is.null(fr), is.finite(fr$D), fr$D > 0)
-  geom <- .geom_for_null(input$trk_geom_type %||% "none")
+  geom <- .geom_for_null(input$trk_geom_type %||% TRK_DEFAULTS$trk_geom_type)
   params <- list(
-    R    = max(1, as.numeric(input$trk_disp_R    %||% 500)),
-    r    = max(1, as.numeric(input$trk_disp_r    %||% 400)),
-    Lcyl = max(1, as.numeric(input$trk_disp_L    %||% 2000)),
-    a    = max(1, as.numeric(input$trk_disp_a    %||% 500)),
-    b    = max(1, as.numeric(input$trk_disp_b    %||% 500)),
-    c    = max(1, as.numeric(input$trk_disp_c    %||% 900)),
-    mtilt = max(0, as.numeric(input$trk_disp_mtilt %||% 0)))
+    R    = max(1, as.numeric(input$trk_disp_R    %||% TRK_DEFAULTS$trk_disp_R)),
+    r    = max(1, as.numeric(input$trk_disp_r    %||% TRK_DEFAULTS$trk_disp_r)),
+    Lcyl = max(1, as.numeric(input$trk_disp_L    %||% TRK_DEFAULTS$trk_disp_L)),
+    a    = max(1, as.numeric(input$trk_disp_a    %||% TRK_DEFAULTS$trk_disp_a)),
+    b    = max(1, as.numeric(input$trk_disp_b    %||% TRK_DEFAULTS$trk_disp_b)),
+    c    = max(1, as.numeric(input$trk_disp_c    %||% TRK_DEFAULTS$trk_disp_c)),
+    mtilt = max(0, as.numeric(input$trk_disp_mtilt %||% TRK_DEFAULTS$trk_disp_mtilt)))
   # Anything that is not volume-filling sits on the boundary (same mapping the
   # displacement null uses), so filament and surface both simulate on the surface.
-  mode <- if (identical(input$trk_motion %||% "volume", "volume")) "volume" else "surface"
+  mode <- if (identical(input$trk_motion %||% TRK_DEFAULTS$trk_motion, "volume")) "volume" else "surface"
   keep <- ub$keep_lag & is.finite(ub$msd)
   lags <- ub$lag[keep]
   if (!length(lags)) return(NULL)
@@ -486,8 +486,8 @@ msd_geom_null <- reactive({
   # scale, PLUS an even spread inside the fit window. The fit-window points are what
   # the D-shortfall estimate below is regressed on, and a purely log grid leaves that
   # regression resting on a handful of long lags, which made it noisy.
-  lo_w <- max(1L, as.integer(input$trk_uni_min_lag %||% 4L))
-  hi_w <- max(lo_w + 2L, as.integer(input$trk_uni_max_lag %||% 50L))
+  lo_w <- max(1L, as.integer(input$trk_uni_min_lag %||% TRK_DEFAULTS$trk_uni_min_lag))
+  hi_w <- max(lo_w + 2L, as.integer(input$trk_uni_max_lag %||% TRK_DEFAULTS$trk_uni_max_lag))
   hi_w <- min(hi_w, max(lags))
   grid <- unique(c(
     round(exp(seq(log(1), log(max(lags)), length.out = 40))),
@@ -513,25 +513,25 @@ msd_geom_null <- reactive({
 # The MSD panel's fit settings, for computing the same upper-regime D anywhere
 # (msd_headline, est_msd.R): Data Quality's headline D and Compare Cells.
 .msd_settings <- function(df) {
-  ndim_sel <- input$trk_msd_ndim %||% "auto"
+  ndim_sel <- input$trk_msd_ndim %||% TRK_DEFAULTS$trk_msd_ndim
   has_z <- if (identical(ndim_sel, "2")) FALSE
            else if (identical(ndim_sel, "3")) ("z" %in% names(df))
            else .has_real_z(df)
-  lo <- max(1L, as.integer(input$trk_uni_min_lag %||% 5L))
-  hi <- max(lo + 2L, as.integer(input$trk_uni_max_lag %||% 50L))
-  list(window = c(lo, hi), track_weight = isTRUE(input$trk_uni_track_weight %||% TRUE),
-       iterative = isTRUE(input$trk_uni_iterative %||% TRUE),
-       linear_tau = isTRUE(input$trk_uni_linear_tau %||% TRUE),
-       min_pts = max(5L, as.integer(input$trk_msd_min_pts %||% 50L)),
+  lo <- max(1L, as.integer(input$trk_uni_min_lag %||% TRK_DEFAULTS$trk_uni_min_lag))
+  hi <- max(lo + 2L, as.integer(input$trk_uni_max_lag %||% TRK_DEFAULTS$trk_uni_max_lag))
+  list(window = c(lo, hi), track_weight = isTRUE(input$trk_uni_track_weight %||% TRK_DEFAULTS$trk_uni_track_weight),
+       iterative = isTRUE(input$trk_uni_iterative %||% TRK_DEFAULTS$trk_uni_iterative),
+       linear_tau = isTRUE(input$trk_uni_linear_tau %||% TRK_DEFAULTS$trk_uni_linear_tau),
+       min_pts = max(5L, as.integer(input$trk_msd_min_pts %||% TRK_DEFAULTS$trk_msd_min_pts)),
        R = tryCatch(trk_blur()$R_msd, error = function(e) 0),
        coef = c(d2 = 2 * .msd_d_eff(2L), d3 = 2 * .msd_d_eff(3L)), has_z = has_z)
 }
 
 msd_unified_fit <- function(ub) {
-  min_lag <- max(1L, as.integer(isolate(input$trk_uni_min_lag) %||% 4L))
+  min_lag <- max(1L, as.integer(isolate(input$trk_uni_min_lag) %||% TRK_DEFAULTS$trk_uni_min_lag))
   # Upper fit limit (Vogler fit_limits, default 50). Read WITHOUT isolate so the
   # plot/estimates that call this re-render when the user changes it.
-  max_lag <- max(min_lag + 2L, as.integer(input$trk_uni_max_lag %||% 50L))
+  max_lag <- max(min_lag + 2L, as.integer(input$trk_uni_max_lag %||% TRK_DEFAULTS$trk_uni_max_lag))
   tau_use <- if (isTRUE(isolate(input$trk_uni_linear_tau))) ub$tau_lin else ub$tau
   ok  <- is.finite(tau_use) & is.finite(ub$msd) & ub$keep_lag &
          ub$lag >= min_lag & ub$lag <= max_lag
@@ -555,10 +555,10 @@ msd_unified_fit <- function(ub) {
 # Ensemble-MSD model fit for the unified plot (selectable model). Non-linear
 # models fit the whole [min_lag, max_lag] window (they need curvature/plateau).
 msd_unified_modelfit <- function(ub) {
-  model <- input$trk_uni_model %||% "linear"
+  model <- input$trk_uni_model %||% TRK_DEFAULTS$trk_uni_model
   if (identical(model, "linear")) return(msd_unified_fit(ub))
-  min_lag <- max(1L, as.integer(input$trk_uni_min_lag %||% 4L))
-  max_lag <- max(min_lag + 2L, as.integer(input$trk_uni_max_lag %||% 50L))
+  min_lag <- max(1L, as.integer(input$trk_uni_min_lag %||% TRK_DEFAULTS$trk_uni_min_lag))
+  max_lag <- max(min_lag + 2L, as.integer(input$trk_uni_max_lag %||% TRK_DEFAULTS$trk_uni_max_lag))
   tau_use <- if (isTRUE(input$trk_uni_linear_tau)) ub$tau_lin else ub$tau
   ok <- is.finite(tau_use) & is.finite(ub$msd) & ub$keep_lag &
         ub$lag >= min_lag & ub$lag <= max_lag
@@ -599,8 +599,8 @@ msd_unified_modelfit <- function(ub) {
 trk_unified_tdiff <- reactive({
   ub <- tryCatch(msd_unified_bundle(), error = function(e) NULL)
   if (is.null(ub) || is.null(ub$track_msd) || ncol(ub$track_msd) == 0L) return(NULL)
-  min_lag   <- max(1L, as.integer(input$trk_uni_min_lag %||% 4L))
-  max_lag_e <- max(min_lag + 2L, as.integer(input$trk_uni_max_lag %||% 50L))
+  min_lag   <- max(1L, as.integer(input$trk_uni_min_lag %||% TRK_DEFAULTS$trk_uni_min_lag))
+  max_lag_e <- max(min_lag + 2L, as.integer(input$trk_uni_max_lag %||% TRK_DEFAULTS$trk_uni_max_lag))
   # The per-track fits and their summary: msd_pertrack_fits(), R/est_msd.R.
   msd_pertrack_fits(ub, min_lag, max_lag_e, use_iter = isTRUE(input$trk_uni_iterative),
                     linear_tau = isTRUE(input$trk_uni_linear_tau), R_msd = trk_blur()$R_msd)
@@ -619,8 +619,8 @@ trk_unified_cluster_diff <- reactive({
   if (is.null(ub) || is.null(cl) || is.null(ub$track_msd)) return(NULL)
   tids_u    <- if (!is.null(ub$tk_names)) ub$tk_names else as.character(seq_len(ncol(ub$track_msd)))
   cids      <- cl$cluster_ids[tids_u]
-  min_lag   <- max(1L, as.integer(input$trk_uni_min_lag %||% 4L))
-  max_lag_c <- max(min_lag + 2L, as.integer(input$trk_uni_max_lag %||% 50L))
+  min_lag   <- max(1L, as.integer(input$trk_uni_min_lag %||% TRK_DEFAULTS$trk_uni_min_lag))
+  max_lag_c <- max(min_lag + 2L, as.integer(input$trk_uni_max_lag %||% TRK_DEFAULTS$trk_uni_max_lag))
   tau_sel   <- if (isTRUE(input$trk_uni_linear_tau)) ub$tau_lin else ub$tau
   use_iter  <- isTRUE(input$trk_uni_iterative)
   pt <- if (!is.null(td)) td$pertrack else NULL
@@ -656,7 +656,7 @@ output$trk_msd_unified_plot <- renderPlotly({
   dark <- isTRUE(isolate(input$trk_dark_mode))
   bg <- if (dark) "#000000" else "#FFFFFF"; fg <- if (dark) "#FFFFFF" else "#333333"
   show_band <- isTRUE(input$trk_uni_show_band); show_ntau <- isTRUE(input$trk_uni_show_ntau)
-  min_lag <- max(1L, as.integer(input$trk_uni_min_lag %||% 4L))
+  min_lag <- max(1L, as.integer(input$trk_uni_min_lag %||% TRK_DEFAULTS$trk_uni_min_lag))
   linear_tau <- isTRUE(input$trk_uni_linear_tau)
   tau_full <- if (linear_tau) ub$tau_lin else ub$tau
 
@@ -943,8 +943,8 @@ trk_msd_bindiag <- reactive({
   list(lag = lag, npair = npair, ntrk = ntrk, ratio = ratio, keep = keep,
        tc = tc, trust_lag = trust_lag, plateau = plateau,
        sw_eff = sw_eff, ceiling_ratio = ceiling_ratio, tc_flag = tc_flag,
-       min_lag = max(1L, as.integer(input$trk_uni_min_lag %||% 4L)),
-       max_lag = max(3L, as.integer(input$trk_uni_max_lag %||% 50L)))
+       min_lag = max(1L, as.integer(input$trk_uni_min_lag %||% TRK_DEFAULTS$trk_uni_min_lag)),
+       max_lag = max(3L, as.integer(input$trk_uni_max_lag %||% TRK_DEFAULTS$trk_uni_max_lag)))
 })
 
 output$trk_msd_bindiag_plot <- renderPlotly({
@@ -1171,8 +1171,8 @@ output$trk_msd_unified_estimates <- renderUI({
   geom_note <- {
     gm <- tryCatch(msd_geom_null(), error = function(e) NULL)
     if (is.null(gm) || !nrow(gm)) NULL else {
-      lo <- max(1L, as.integer(input$trk_uni_min_lag %||% 4L))
-      hi <- max(lo + 2L, as.integer(input$trk_uni_max_lag %||% 50L))
+      lo <- max(1L, as.integer(input$trk_uni_min_lag %||% TRK_DEFAULTS$trk_uni_min_lag))
+      hi <- max(lo + 2L, as.integer(input$trk_uni_max_lag %||% TRK_DEFAULTS$trk_uni_max_lag))
       w  <- gm$lag >= lo & gm$lag <= hi
       # Fit the SELECTED model to the simulated free-on-geometry curve, over the same
       # window, and report what it returns. Nothing is confined, drifting or anomalous

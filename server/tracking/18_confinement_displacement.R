@@ -87,13 +87,13 @@ conf_ci_bundle <- eventReactive(input$trk_conf_ci_run, {
   gap_p <- if (length(kk) > 50L) { tb <- tabulate(pmin(kk, 15L), nbins = 15L); tb / sum(tb) }
            else c(0.55, 0.22, 0.09, 0.05, 0.04, 0.05)
 
-  min_lag <- max(1L, as.integer(input$trk_uni_min_lag %||% 4L))
-  max_lag <- max(min_lag + 2L, as.integer(input$trk_uni_max_lag %||% 50L))
+  min_lag <- max(1L, as.integer(input$trk_uni_min_lag %||% TRK_DEFAULTS$trk_uni_min_lag))
+  max_lag <- max(min_lag + 2L, as.integer(input$trk_uni_max_lag %||% TRK_DEFAULTS$trk_uni_max_lag))
   Ns <- pt$n_loc
   grid <- if (length(unique(Ns)) <= 8L) sort(unique(Ns))
           else sort(unique(pmax(5L, round(stats::quantile(Ns, seq(0, 1, length.out = 8L),
                                                           names = FALSE)))))
-  nsim <- max(50L, min(500L, as.integer(input$trk_conf_ci_nsim %||% 200L)))
+  nsim <- max(50L, min(500L, as.integer(input$trk_conf_ci_nsim %||% TRK_DEFAULTS$trk_conf_ci_nsim)))
 
   # ── D grid ────────────────────────────────────────────────────────────────
   # The free CI depends on x = σ_loc²/(D·t_c), so the null is matched on each
@@ -265,13 +265,13 @@ output$trk_conf_ci_plot <- renderPlotly({
 trk_disp_bundle <- eventReactive(input$trk_disp_run, {
   req(isTRUE(input$trk_show_disp))
   df <- trk(); req(nrow(df) > 0)
-  min_pts <- max(3L, as.integer(input$trk_disp_min_pts %||% 10L))
+  min_pts <- max(3L, as.integer(input$trk_disp_min_pts %||% TRK_DEFAULTS$trk_disp_min_pts))
 
   # Dimensionality: net displacement (and the free null) in 2D or 3D. "Auto" uses z when
   # it carries real signal. 2D data → 2D; 3D data → 3D (Rayleigh vs Maxwell null). The
   # geometry null (Step 2) then projects (2D) or stays 3D to match.
   z_has <- .has_real_z(df)
-  dmode <- input$trk_disp_dims %||% "auto"
+  dmode <- input$trk_disp_dims %||% TRK_DEFAULTS$trk_disp_dims
   use3d <- (identical(dmode, "auto") && z_has) || identical(dmode, "3d")
   if (use3d && !z_has) use3d <- FALSE                       # asked for 3D but no z signal
   d_obs <- if (use3d) 3L else 2L
@@ -291,7 +291,7 @@ trk_disp_bundle <- eventReactive(input$trk_disp_run, {
   # cancel and this reduces exactly to the previous expression.
   # Degrees of freedom of the motion, from the shared Sample geometry setting.
   d_mot <- {
-    mo <- input$trk_motion %||% "volume"
+    mo <- input$trk_motion %||% TRK_DEFAULTS$trk_motion
     if (identical(mo, "filament")) 1L
     else if (identical(mo, "surface")) min(2L, d_obs)
     else d_obs
@@ -310,7 +310,7 @@ trk_disp_bundle <- eventReactive(input$trk_disp_run, {
   #              already bent down inside that window, so this D is DEFLATED and the
   #              test loses power (it under-calls confinement). Offered for comparison.
   #   Manual   - a literature/known value, or for sensitivity testing.
-  dsrc  <- input$trk_disp_dsrc %||% "cve"
+  dsrc  <- input$trk_disp_dsrc %||% TRK_DEFAULTS$trk_disp_dsrc
   b     <- tryCatch(trk_cve_bundle(), error = function(e) NULL)
   D_cve <- if (!is.null(b)) b$D_cve else NA_real_
   D_msd <- {
@@ -318,7 +318,7 @@ trk_disp_bundle <- eventReactive(input$trk_disp_run, {
     fr <- if (!is.null(ub)) tryCatch(msd_unified_modelfit(ub), error = function(e) NULL) else NULL
     if (!is.null(fr) && is.finite(fr$D)) fr$D else NA_real_
   }
-  D_man <- suppressWarnings(as.numeric(input$trk_disp_dman %||% NA_real_)) * 1e3  # µm²/s → nm²/ms
+  D_man <- suppressWarnings(as.numeric(input$trk_disp_dman %||% TRK_DEFAULTS$trk_disp_dman)) * 1e3  # µm²/s → nm²/ms
   D_use <- switch(dsrc, msd = D_msd, manual = D_man, D_cve)
   d_lab <- switch(dsrc, msd = "MSD fit", manual = "manual", "CVE")
   # In-plane (motion) D. CVE and the MSD fit are per-axis over d_obs recorded axes, so
@@ -385,7 +385,7 @@ trk_disp_bundle <- eventReactive(input$trk_disp_run, {
 # Echo the shared geometry inside the displacement panel, so the Step-2 band states
 # which shape it is using without owning a second copy of the control.
 output$trk_disp_geom_echo <- renderUI({
-  g <- input$trk_geom_type %||% "none"
+  g <- input$trk_geom_type %||% TRK_DEFAULTS$trk_geom_type
   params <- list(R = input$trk_disp_R, r = input$trk_disp_r, Lcyl = input$trk_disp_L,
                  a = input$trk_disp_a, b = input$trk_disp_b, c = input$trk_disp_c,
                  mtilt = input$trk_disp_mtilt)
@@ -412,15 +412,15 @@ trk_disp_geom_null <- reactive({
   if (!isTRUE(input$trk_disp_geom)) return(NULL)
   res <- trk_disp_bundle(); req(nrow(res) > 0)
   D_use <- attr(res, "D_use")
-  geom  <- .geom_for_null(input$trk_geom_type %||% "none")
+  geom  <- .geom_for_null(input$trk_geom_type %||% TRK_DEFAULTS$trk_geom_type)
   params <- list(
-    R    = max(1, as.numeric(input$trk_disp_R    %||% 500)),
-    r    = max(1, as.numeric(input$trk_disp_r    %||% 400)),
-    Lcyl = max(1, as.numeric(input$trk_disp_L    %||% 2000)),
-    a    = max(1, as.numeric(input$trk_disp_a    %||% 500)),
-    b    = max(1, as.numeric(input$trk_disp_b    %||% 500)),
-    c    = max(1, as.numeric(input$trk_disp_c    %||% 900)),
-    mtilt = max(0, as.numeric(input$trk_disp_mtilt %||% 0)))
+    R    = max(1, as.numeric(input$trk_disp_R    %||% TRK_DEFAULTS$trk_disp_R)),
+    r    = max(1, as.numeric(input$trk_disp_r    %||% TRK_DEFAULTS$trk_disp_r)),
+    Lcyl = max(1, as.numeric(input$trk_disp_L    %||% TRK_DEFAULTS$trk_disp_L)),
+    a    = max(1, as.numeric(input$trk_disp_a    %||% TRK_DEFAULTS$trk_disp_a)),
+    b    = max(1, as.numeric(input$trk_disp_b    %||% TRK_DEFAULTS$trk_disp_b)),
+    c    = max(1, as.numeric(input$trk_disp_c    %||% TRK_DEFAULTS$trk_disp_c)),
+    mtilt = max(0, as.numeric(input$trk_disp_mtilt %||% TRK_DEFAULTS$trk_disp_mtilt)))
   cyc   <- tryCatch(isolate(trk_cycle_time()), error = function(e) NA_real_)
   if (!is.finite(cyc) || cyc <= 0) cyc <- stats::median(diff(sort(res$dur_ms))) # crude fallback
   if (!is.finite(cyc) || cyc <= 0) return(NULL)
@@ -466,7 +466,7 @@ trk_disp_geom_null <- reactive({
   # Same "Molecule moves" choice that sets the Step-1 degrees of freedom.
   # "surface" and "filament" both mean the molecule is on the boundary; only a
   # volume-filling molecule reflects around inside it.
-  gmode  <- if (identical(input$trk_motion %||% "volume", "volume")) "volume" else "surface"
+  gmode  <- if (identical(input$trk_motion %||% TRK_DEFAULTS$trk_motion, "volume")) "volume" else "surface"
   rnet <- withProgress(message = "Simulating free-on-geometry null…", value = 0.4,
                        sim_free_geom_rnet(durs, D_use, geom, params, dt_sim, proj2d = proj2d,
                                           mode = gmode))

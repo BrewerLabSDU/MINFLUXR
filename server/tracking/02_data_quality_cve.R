@@ -127,7 +127,7 @@ trk_cve_bundle <- eventReactive(input$trk_cve_run, {
   # the dark-cycle tolerance, so a dataset with many gentle 1–2-cycle gaps scores
   # higher than its bare integrated fraction.
   cont_of <- function(d, H) cve_continuity_mean(d, t_c, H)                 # R/est_cve.R
-  H_disp    <- suppressWarnings(as.numeric(input$trk_quality_darktol %||% 3))
+  H_disp    <- suppressWarnings(as.numeric(input$trk_quality_darktol %||% TRK_DEFAULTS$trk_quality_darktol))
   cont_raw  <- cont_of(tryCatch(trk_raw_original(), error = function(e) NULL), H_disp)  # TRUE raw (frozen at upload)
   cont_filt <- cont_of(tryCatch(trk_spatial_filtered(), error = function(e) NULL), H_disp)  # analyzed (live filtered)
 
@@ -141,7 +141,7 @@ trk_cve_bundle <- eventReactive(input$trk_cve_run, {
   n_vert <- {
     sp <- tryCatch(if (is.null(input$trk_seq_json)) NULL else trk_seq_params(), error = function(e) NULL)
     v  <- if (!is.null(sp) && isTRUE(sp$ok)) sp$vertices else NA_integer_
-    if (!is.finite(v)) suppressWarnings(as.integer(input$trk_hw_vertices %||% 6L)) else v
+    if (!is.finite(v)) suppressWarnings(as.integer(input$trk_hw_vertices %||% TRK_DEFAULTS$trk_hw_vertices)) else v
   }
   if (!is.finite(n_vert) || n_vert < 1L) n_vert <- 6L
   # CVE core (covariance, blur bounds, σ, D) lives in est_cve.R.
@@ -161,8 +161,8 @@ trk_cve_bundle <- eventReactive(input$trk_cve_run, {
   # first `skip` localizations - MINFLUX iterates onto the molecule, so the
   # opening localizations carry lock-on transient and read worse. The spread of
   # this distribution says whether a single global σ_loc is a good approximation.
-  n_min_pt <- max(10L, as.integer(input$trk_sig_min_integ %||% 50L))
-  skip_pt  <- max(0L,  as.integer(input$trk_sig_skip %||% 5L))
+  n_min_pt <- max(10L, as.integer(input$trk_sig_min_integ %||% TRK_DEFAULTS$trk_sig_min_integ))
+  skip_pt  <- max(0L,  as.integer(input$trk_sig_skip %||% TRK_DEFAULTS$trk_sig_skip))
   pos  <- sequence(rle(df$tid)$lengths)                     # within-track index (df sorted)
   post <- pos > skip_pt                                     # localization kept (past lock-on)
   step_post  <- same & post & c(FALSE, post[-n])            # step between two kept locs
@@ -421,7 +421,7 @@ output$trk_cve_status <- renderUI({
   # D in the MOTION's degrees of freedom: a per-axis CVE spreads 2-DOF motion over
   # 3 recorded axes, so surface motion tracked in 3D reads 2/3 of the truth.
   d_obs <- if (isTRUE(b$has_z)) 3L else 2L
-  d_mot <- { mo <- input$trk_motion %||% "volume"
+  d_mot <- { mo <- input$trk_motion %||% TRK_DEFAULTS$trk_motion
              if (identical(mo, "filament")) 1L else if (identical(mo, "surface")) min(2L, d_obs) else d_obs }
   d_use <- b$D_cve * d_obs / d_mot
   # Descriptive only: the single-cycle fraction mostly reflects the sequence (photon
@@ -436,7 +436,7 @@ output$trk_cve_status <- renderUI({
   prof_line <- if (is.finite(b$sig_phot_med %||% NA_real_)) {
     a_used <- b$a_pref %||% NA_real_
     ideal  <- .tcp_geom(b$tcp_pattern %||% TCP_PATTERN_DEFAULT)$a_ideal
-    prof   <- trk_cal_profiles()[[input$trk_cal_profile %||% ""]]
+    prof   <- trk_cal_profiles()[[input$trk_cal_profile %||% TRK_DEFAULTS$trk_cal_profile]]
     if (!is.null(prof) && isTRUE(abs(a_used - prof$a) < 1e-3))
       row(dim_(sprintf("calibrated: %s  \u00b7  a = %.2f (quartiles %.2f\u2013%.2f over %d cells)",
                        prof$name, prof$a, prof$a_q25 %||% NA_real_, prof$a_q75 %||% NA_real_,
@@ -467,16 +467,16 @@ output$trk_cve_status <- renderUI({
   calib_line <- row(dim_(sprintf(
     "cycle %s  \u00b7  CVE D %s \u00b5m\u00b2/s%s  \u00b7  %s steps",
     num(b$t_cycle, "%.4g ms", "unknown"), num(d_use / 1e3, "%.3g"),
-    if (d_mot != d_obs) sprintf(" (%d/%d for %s)", d_obs, d_mot, input$trk_motion %||% "volume") else "",
+    if (d_mot != d_obs) sprintf(" (%d/%d for %s)", d_obs, d_mot, input$trk_motion %||% TRK_DEFAULTS$trk_motion) else "",
     format(b$n_steps, big.mark = ","))))
 
   # Tracker wander floor: the apparent diffusion the loop produces on an immobile
   # target. Reported beside D, never subtracted silently - D_w scales with the
   # photon budget, so a single constant would over-correct dim tracks.
   dw_line <- {
-    dw <- suppressWarnings(as.numeric(input$trk_dw_floor %||% 0))
+    dw <- suppressWarnings(as.numeric(input$trk_dw_floor %||% TRK_DEFAULTS$trk_dw_floor))
     d_head <- if (is.finite(b$D_msd %||% NA_real_)) b$D_msd else d_use   # the headline D
-    prof <- trk_cal_profiles()[[input$trk_cal_profile %||% ""]]
+    prof <- trk_cal_profiles()[[input$trk_cal_profile %||% TRK_DEFAULTS$trk_cal_profile]]
     win_note <- if (!is.null(prof) && length(prof$window) == 2L &&
                     !isTRUE(all(as.integer(prof$window) == as.integer(b$msd_window))))
       sprintf(" (floor measured over cycles %d\u2013%d, D over %d\u2013%d)", as.integer(prof$window[1]),
@@ -606,7 +606,7 @@ output$trk_continuity_mobility <- renderUI({
       "Run Estimate σ_loc & quality first."))
   df  <- tryCatch(trk(), error = function(e) NULL)
   t_c <- tryCatch(trk_cycle_time(), error = function(e) NA_real_)
-  H   <- suppressWarnings(as.numeric(input$trk_quality_darktol %||% 3))
+  H   <- suppressWarnings(as.numeric(input$trk_quality_darktol %||% TRK_DEFAULTS$trk_quality_darktol))
   sc  <- .continuity_scores(df, t_c, H)
   tab <- continuity_mobility_table(df, sc, t_c, has_z = .has_real_z(df))
   if (is.null(tab))

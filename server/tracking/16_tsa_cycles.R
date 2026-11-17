@@ -86,7 +86,7 @@ cycle_class_bundle <- eventReactive(input$trk_tsa_run, {
   shiny::validate(shiny::need(is.finite(t_c) && t_c > 0, "Could not determine cycle time."))
   hw_used <- { hw <- trk_hw_cycle_time(); is.finite(hw) && hw > 0 }
 
-  max_disp <- max(5L, as.integer(input$trk_cycle_dark_max %||% 20L))
+  max_disp <- max(5L, as.integer(input$trk_cycle_dark_max %||% TRK_DEFAULTS$trk_cycle_dark_max))
   c(cycle_class_counts(vec, t_c, max_disp), list(hw_used = hw_used))   # R/trk_stats.R
   })  # withProgress
 })

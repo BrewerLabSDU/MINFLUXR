@@ -128,7 +128,7 @@ output$trk_dt_hist_jdd <- renderPlotly({
   shp <- list(); ann <- list()
   if (isTRUE(input$trk_dt_mark_cycles %||% TRUE) &&
       is.finite(t_c) && t_c > 0 && is.finite(dt_hsm)) {
-    n_cap <- suppressWarnings(as.integer(input$trk_cycle_dark_max %||% 10L))
+    n_cap <- suppressWarnings(as.integer(input$trk_cycle_dark_max %||% TRK_DEFAULTS$trk_cycle_dark_max))
     if (!is.finite(n_cap) || n_cap < 1L) n_cap <- 10L
     Nmax  <- max(1L, min(n_cap, 12L, as.integer(floor((rng[2] - dt_hsm) / t_c)) + 1L))
     grid_c <- if (dark) "rgba(200,200,200,0.35)" else "rgba(90,90,90,0.35)"
@@ -248,7 +248,7 @@ msd_export <- reactive({
     tau_axis           = if (linear_tau) "linearized lag × cycle" else "real mean Δt per bin",
     ensemble_weighting = if (isTRUE(ub$track_weighted)) "track-weighted (eMSD)" else "pair-weighted",
     fit_method         = if (isTRUE(input$trk_uni_iterative)) "iterative OLSF" else "anchored OLSF + Michalet",
-    fit_window_cycles  = sprintf("%s-%s", input$trk_uni_min_lag %||% 5, input$trk_uni_max_lag %||% 50),
+    fit_window_cycles  = sprintf("%s-%s", input$trk_uni_min_lag %||% TRK_DEFAULTS$trk_uni_min_lag, input$trk_uni_max_lag %||% TRK_DEFAULTS$trk_uni_max_lag),
     cycle_time_ms      = ub$t_cycle,
     msd_ndim           = ub$ndim,
     eDIFF_um2_s        = if (!is.null(fr)) fr$D / 1e3 else NA_real_,
@@ -285,7 +285,7 @@ msd_cluster_rv <- reactive({
   fits <- msd_pertk_fits()
   req(!is.null(fits) && nrow(fits) >= 3L)
 
-  k <- max(2L, min(6L, as.integer(input$trk_msd_n_clusters %||% 3L)))
+  k <- max(2L, min(6L, as.integer(input$trk_msd_n_clusters %||% TRK_DEFAULTS$trk_msd_n_clusters)))
   req(nrow(fits) >= k)
 
   # Feature matrix: alpha (primary) + log10(CI) (secondary).
@@ -338,8 +338,8 @@ msd_cluster_models <- reactive({
   cl <- tryCatch(msd_cluster_rv(), error = function(e) NULL)
   ub <- tryCatch(msd_unified_bundle(), error = function(e) NULL)
   if (is.null(cl) || is.null(ub) || is.null(ub$track_msd)) return(NULL)
-  min_lag <- max(1L, as.integer(input$trk_uni_min_lag %||% 4L))
-  max_lag <- max(min_lag + 2L, as.integer(input$trk_uni_max_lag %||% 50L))
+  min_lag <- max(1L, as.integer(input$trk_uni_min_lag %||% TRK_DEFAULTS$trk_uni_min_lag))
+  max_lag <- max(min_lag + 2L, as.integer(input$trk_uni_max_lag %||% TRK_DEFAULTS$trk_uni_max_lag))
   tau_all <- if (isTRUE(input$trk_uni_linear_tau)) ub$tau_lin else ub$tau
   win <- ub$lag >= min_lag & ub$lag <= max_lag & ub$keep_lag & is.finite(tau_all)
   if (sum(win) < 5L) return(NULL)

@@ -69,7 +69,7 @@ hmm_bundle <- eventReactive(input$trk_hmm_run, {
   df <- trk(); req(nrow(df) > 0)
   K       <- max(2L, min(4L, as.integer(input$trk_hmm_n_states)))
   min_pts <- max(4L, as.integer(input$trk_hmm_min_pts))
-  B       <- max(0L, min(200L, as.integer(input$trk_hmm_boot %||% 0L)))
+  B       <- max(0L, min(200L, as.integer(input$trk_hmm_boot %||% TRK_DEFAULTS$trk_hmm_boot)))
   t_c     <- tryCatch(trk_cycle_time(), error = function(e) NA_real_)
   shiny::validate(shiny::need(is.finite(t_c) && t_c > 0,
     "Cycle time unknown - run Data Quality & Calibration first."))
@@ -109,7 +109,7 @@ hmm_bundle <- eventReactive(input$trk_hmm_run, {
   # the step count, is what limits how precisely D is known, so beyond a budget
   # the extra steps buy time rather than certainty. Whole TRACKS are drawn, never
   # parts of them, so no track is cut in half.
-  cap <- suppressWarnings(as.integer(input$trk_hmm_max_steps %||% 0L))
+  cap <- suppressWarnings(as.integer(input$trk_hmm_max_steps %||% TRK_DEFAULTS$trk_hmm_max_steps))
   n_sub_tracks <- NA_integer_
   if (is.finite(cap) && cap > 0) {
     per_tid <- table(d_in$tid)
@@ -481,11 +481,11 @@ seg_msd_rv <- eventReactive(input$trk_seg_msd_run, {
   t_c <- trk_cycle_time(); req(is.finite(t_c) && t_c > 0)
   cc  <- tryCatch(trk_cluster_cycle(), error = function(e) NULL)
   sw  <- if (!is.null(cc) && is.finite(cc$sw)) cc$sw else 0
-  min_seg <- max(5L, as.integer(input$trk_seg_msd_min_pts %||% 15L))
+  min_seg <- max(5L, as.integer(input$trk_seg_msd_min_pts %||% TRK_DEFAULTS$trk_seg_msd_min_pts))
   has_z <- any(vapply(bd$seg_list, function(d) "z" %in% names(d) && any(is.finite(d$z)), logical(1)))
-  ndim_sel <- input$trk_msd_ndim %||% "auto"
+  ndim_sel <- input$trk_msd_ndim %||% TRK_DEFAULTS$trk_msd_ndim
   ndim <- if (identical(ndim_sel, "3")) 3L else if (identical(ndim_sel, "2")) 2L else if (has_z) 3L else 2L
-  max_lag <- max(60L, min(5000L, as.integer(input$trk_uni_max_lag %||% 50L)))
+  max_lag <- max(60L, min(5000L, as.integer(input$trk_uni_max_lag %||% TRK_DEFAULTS$trk_uni_max_lag)))
 
   dr2 <- matrix(0,  max_lag, K); np <- matrix(0L, max_lag, K); dts <- matrix(0, max_lag, K)
   n_seg <- integer(K); n_pts <- integer(K)
@@ -522,9 +522,9 @@ seg_msd_rv <- eventReactive(input$trk_seg_msd_run, {
     }
   })
 
-  model    <- input$trk_uni_model %||% "linear"
-  min_lag  <- max(1L, as.integer(input$trk_uni_min_lag %||% 5L))
-  max_fit  <- max(min_lag + 2L, as.integer(input$trk_uni_max_lag %||% 50L))
+  model    <- input$trk_uni_model %||% TRK_DEFAULTS$trk_uni_model
+  min_lag  <- max(1L, as.integer(input$trk_uni_min_lag %||% TRK_DEFAULTS$trk_uni_min_lag))
+  max_fit  <- max(min_lag + 2L, as.integer(input$trk_uni_max_lag %||% TRK_DEFAULTS$trk_uni_max_lag))
   use_iter <- isTRUE(input$trk_uni_iterative)
   linear_tau <- isTRUE(input$trk_uni_linear_tau)
   lag_v <- seq_len(max_lag)

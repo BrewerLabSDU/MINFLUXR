@@ -103,16 +103,16 @@ trk_filt_ranges <- reactive(stats::setNames(
 # t_c / sw belong to the dataset and are filled in by the caller.
 trk_filter_params <- function() isolate(list(
   split   = list(enable = isTRUE(input$trk_split_gaps_enable), adaptive = isTRUE(input$trk_split_adaptive),
-                 gap_cycles = input$trk_split_gap_cycles, min_len = input$trk_split_min_len %||% 50L,
+                 gap_cycles = input$trk_split_gap_cycles, min_len = input$trk_split_min_len %||% TRK_DEFAULTS$trk_split_min_len,
                  maxoff_ms = tryCatch({ sp <- trk_seq_params()
                                         if (!is.null(sp) && isTRUE(sp$ok) && is.finite(sp$maxOffTime_ms))
                                           sp$maxOffTime_ms else 3.0 }, error = function(e) 3.0)),
   trim    = list(enable = isTRUE(input$trk_endtrim_enable), dark = isTRUE(input$trk_endtrim_dark),
-                 dark_cycles = input$trk_endtrim_dark_cycles %||% 3L, efo = isTRUE(input$trk_endtrim_efo),
-                 efo_frac = suppressWarnings(as.numeric(input$trk_endtrim_efo_frac %||% 0.5))),
+                 dark_cycles = input$trk_endtrim_dark_cycles %||% TRK_DEFAULTS$trk_endtrim_dark_cycles, efo = isTRUE(input$trk_endtrim_efo),
+                 efo_frac = suppressWarnings(as.numeric(input$trk_endtrim_efo_frac %||% TRK_DEFAULTS$trk_endtrim_efo_frac))),
   gate    = list(enable = isTRUE(input$trk_quality_enable),
-                 min_score = suppressWarnings(as.numeric(input$trk_quality_min_integ %||% 0.6)),
-                 half_life = suppressWarnings(as.numeric(input$trk_quality_darktol %||% 3))),
+                 min_score = suppressWarnings(as.numeric(input$trk_quality_min_integ %||% TRK_DEFAULTS$trk_quality_min_integ)),
+                 half_life = suppressWarnings(as.numeric(input$trk_quality_darktol %||% TRK_DEFAULTS$trk_quality_darktol))),
   ranges  = trk_filt_ranges(), tid_len = trk_filt$tid_len, dur = trk_filt$dur))
 
 # ===========================================================================
@@ -150,7 +150,7 @@ trk_gap_split <- reactive({
   gap_thresh <- gap_cycles * modal_dt   # ms
   # Min-length applies in BOTH modes now (was adaptive-only): drop short fragments
   # so a fixed 7-cycle split doesn't manufacture 2–3-loc stubs and flood the plot.
-  min_len <- max(1L, as.integer(isolate(input$trk_split_min_len %||% 50L)))
+  min_len <- max(1L, as.integer(isolate(input$trk_split_min_len %||% TRK_DEFAULTS$trk_split_min_len)))
   # The split itself (idempotent on an existing "_s<N>" suffix, radix-sorted,
   # short fragments dropped) is split_gaps() in R/est_clean.R, shared with the
   # per-cell comparison.
@@ -173,12 +173,12 @@ trk_end_trimmed <- reactive({
   # Length floor: gap splitting promises segments of at least `min_len`
   # localizations, so trimming stops there rather than breaking that promise.
   floor_len <- if (isTRUE(isolate(input$trk_split_gaps_enable)))
-                 max(1L, as.integer(isolate(input$trk_split_min_len) %||% 1L)) else 1L
+                 max(1L, as.integer(isolate(input$trk_split_min_len) %||% TRK_DEFAULTS$trk_split_min_len)) else 1L
   trim_track_ends(df, tryCatch(isolate(trk_cycle_time()), error = function(e) NA_real_),
                   use_dark    = isTRUE(isolate(input$trk_endtrim_dark)),
-                  dark_cycles = isolate(input$trk_endtrim_dark_cycles %||% 3L),
+                  dark_cycles = isolate(input$trk_endtrim_dark_cycles %||% TRK_DEFAULTS$trk_endtrim_dark_cycles),
                   use_efo     = isTRUE(isolate(input$trk_endtrim_efo)),
-                  efo_frac    = suppressWarnings(as.numeric(isolate(input$trk_endtrim_efo_frac %||% 0.5))),
+                  efo_frac    = suppressWarnings(as.numeric(isolate(input$trk_endtrim_efo_frac %||% TRK_DEFAULTS$trk_endtrim_efo_frac))),
                   floor_len   = floor_len)                 # R/est_clean.R
 })
 
@@ -194,8 +194,8 @@ trk_quality_filtered <- reactive({
   if (!isTRUE(isolate(input$trk_quality_enable)) || nrow(df) == 0 || !"tim" %in% names(df))
     return(df)
   gate_continuity(df, tryCatch(isolate(trk_cycle_time()), error = function(e) NA_real_),
-                  min_score = suppressWarnings(as.numeric(isolate(input$trk_quality_min_integ) %||% 0.6)),
-                  half_life = suppressWarnings(as.numeric(isolate(input$trk_quality_darktol) %||% 3)))
+                  min_score = suppressWarnings(as.numeric(isolate(input$trk_quality_min_integ) %||% TRK_DEFAULTS$trk_quality_min_integ)),
+                  half_life = suppressWarnings(as.numeric(isolate(input$trk_quality_darktol) %||% TRK_DEFAULTS$trk_quality_darktol)))
 })
 
 # Stage 5: trace ID length - localization count per TID, measured AFTER cleaning

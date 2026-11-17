@@ -190,7 +190,7 @@ observeEvent(input$trk_cal_save, {
 # Keep the Acquisition Parameters selector in step with the profiles.
 observeEvent(trk_cal_profiles(), {
   nms <- names(trk_cal_profiles())
-  sel <- isolate(input$trk_cal_profile %||% "")
+  sel <- isolate(input$trk_cal_profile %||% TRK_DEFAULTS$trk_cal_profile)
   updateSelectInput(session, "trk_cal_profile",
                     choices = c("None (uncalibrated)" = "", stats::setNames(nms, nms)),
                     selected = if (sel %in% nms) sel else "")
@@ -241,7 +241,7 @@ observeEvent(input$trk_cal_profiles_ul, {
 
 # Applying a profile sets a, D_w, the pattern and L; "None" returns to uncalibrated.
 observeEvent(input$trk_cal_profile, {
-  nm <- input$trk_cal_profile %||% ""
+  nm <- input$trk_cal_profile %||% TRK_DEFAULTS$trk_cal_profile
   if (!nzchar(nm)) {
     updateNumericInput(session, "trk_crlb_pref", value = NA)
     updateNumericInput(session, "trk_dw_floor", value = 0)

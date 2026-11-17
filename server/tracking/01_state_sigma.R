@@ -134,7 +134,7 @@ trk_sigma_loc_rv     <- reactiveVal(NA_real_)   # nm, from the last unified MSD 
 trk_sigma_loc_cve    <- reactiveVal(NA_real_)   # nm, blur-aware CVE (cross-check)
 trk_sigma_loc_photon <- reactiveVal(NA_real_)   # nm, median L/(4*sqrt(eco))
 trk_sigma_loc_eff <- reactive({
-  manual <- suppressWarnings(as.numeric(input$trk_sigma_loc_nm %||% 0))
+  manual <- suppressWarnings(as.numeric(input$trk_sigma_loc_nm %||% TRK_DEFAULTS$trk_sigma_loc_nm))
   if (is.finite(manual) && manual > 0) return(manual)
   ph <- trk_sigma_loc_photon()
   if (is.finite(ph) && ph > 0) return(ph)
@@ -145,7 +145,7 @@ trk_sigma_loc_eff <- reactive({
 })
 # Which source is currently active (for status readouts).
 trk_sigma_loc_src <- reactive({
-  manual <- suppressWarnings(as.numeric(input$trk_sigma_loc_nm %||% 0))
+  manual <- suppressWarnings(as.numeric(input$trk_sigma_loc_nm %||% TRK_DEFAULTS$trk_sigma_loc_nm))
   if (is.finite(manual) && manual > 0) "manual override"
   else if (is.finite(trk_sigma_loc_photon())) "photon budget"
   else if (is.finite(trk_sigma_loc_cve())) "CVE (cross-check)"
@@ -168,7 +168,7 @@ trk_sigma_loc_src <- reactive({
     list(sigma = if (length(sigma)) as.numeric(sigma[1]) else NA_real_,
          source = source %||% trk_sigma_loc_src(), role = role, used = used, note = note,
          a = .a_in_use(pat), a_calibrated = length(typed) == 1L && is.finite(typed) && typed > 0,
-         profile = input$trk_cal_profile %||% "")
+         profile = input$trk_cal_profile %||% TRK_DEFAULTS$trk_cal_profile)
   })
 }
 

@@ -98,7 +98,7 @@ dir_bundle <- eventReactive(input$trk_dir_run, {
   req(isTRUE(input$trk_show_dir))
   df <- trk(); req(nrow(df) > 0)
   min_pts  <- max(4L, as.integer(input$trk_dir_min_pts))
-  max_dark <- max(0L, as.integer(input$trk_dir_max_dark %||% 2L))
+  max_dark <- max(0L, as.integer(input$trk_dir_max_dark %||% TRK_DEFAULTS$trk_dir_max_dark))
   # Cycle time for the lag axis and the app-wide sigma_loc for the noise floor;
   # the computation is dir_compute() in R/est_directionality.R.
   t_c     <- tryCatch(trk_cycle_time(), error = function(e) NA_real_)

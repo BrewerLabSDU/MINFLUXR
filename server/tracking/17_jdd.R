@@ -101,7 +101,7 @@ jdd_bundle <- eventReactive(input$trk_jdd_run, {
   min_dt    <- suppressWarnings(as.numeric(input$trk_jdd_min_dt))
   max_dt    <- suppressWarnings(as.numeric(input$trk_jdd_max_dt))
   sigma_loc <- suppressWarnings(as.numeric(input$trk_jdd_sigma_loc))
-  step_mode <- input$trk_jdd_step_mode %||% "consec"
+  step_mode <- input$trk_jdd_step_mode %||% TRK_DEFAULTS$trk_jdd_step_mode
   bin_width <- suppressWarnings(as.numeric(input$trk_jdd_bin_width))
   subsamp_n <- suppressWarnings(as.integer(input$trk_jdd_subsamp_n))
   if (!is.finite(min_dt)    || min_dt    <= 0) min_dt    <- 0

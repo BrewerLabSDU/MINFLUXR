@@ -103,7 +103,7 @@ trk_regression_cycle <- reactive({
   eod <- NA_real_
   if (isTRUE(input$trk_hw_enable)) {
     dwell_us <- suppressWarnings(as.numeric(input$trk_hw_dwell_us))
-    pat <- input$trk_hw_pattern %||% "6"
+    pat <- input$trk_hw_pattern %||% TRK_DEFAULTS$trk_hw_pattern
     nv  <- if (identical(pat, "other")) suppressWarnings(as.integer(input$trk_hw_vertices))
            else suppressWarnings(as.integer(pat))
     if (is.finite(dwell_us) && is.finite(nv) && nv >= 1L)
@@ -119,7 +119,7 @@ trk_hw_cycle_time <- reactive({
   if (!isTRUE(input$trk_hw_enable)) return(NA_real_)
   dwell_us <- suppressWarnings(as.numeric(input$trk_hw_dwell_us))
   eod_us   <- suppressWarnings(as.numeric(input$trk_hw_eod_us))
-  pat      <- input$trk_hw_pattern %||% "6"
+  pat      <- input$trk_hw_pattern %||% TRK_DEFAULTS$trk_hw_pattern
   nv <- if (identical(pat, "other"))
           suppressWarnings(as.integer(input$trk_hw_vertices))
         else suppressWarnings(as.integer(pat))
@@ -284,8 +284,8 @@ output$trk_quality_hint <- renderUI({
     return(tags$p(style = "color:#888; font-size:0.81em;", "Need data to compute track quality."))
   n_in  <- length(unique(din$tid)); n_out <- length(unique(dout$tid))
   t_c   <- tryCatch(trk_cycle_time(), error = function(e) NA_real_)
-  thr   <- max(0, min(1, suppressWarnings(as.numeric(input$trk_quality_min_integ %||% 0.6))))
-  H     <- suppressWarnings(as.numeric(input$trk_quality_darktol %||% 3))
+  thr   <- max(0, min(1, suppressWarnings(as.numeric(input$trk_quality_min_integ %||% TRK_DEFAULTS$trk_quality_min_integ))))
+  H     <- suppressWarnings(as.numeric(input$trk_quality_darktol %||% TRK_DEFAULTS$trk_quality_darktol))
   tags$div(style = "font-size:0.81em; color:#2a6; background:#f0f7f0; border-radius:4px; padding:5px 7px; margin:3px 0;",
     tags$b(sprintf("Tracks: %s → %s kept (%.0f%%)",
                    format(n_in, big.mark = ","), format(n_out, big.mark = ","),
@@ -428,7 +428,7 @@ trk_blur <- reactive({
   if (is.null(b) && is.finite(t_coll)) {
     # Lateral polygon only: an axial pattern loaded from a sequence can set the
     # vertex control to 2, which says nothing about the lateral collection.
-    nv <- suppressWarnings(as.integer(input$trk_hw_vertices %||% 6L))
+    nv <- suppressWarnings(as.integer(input$trk_hw_vertices %||% TRK_DEFAULTS$trk_hw_vertices))
     if (!is.finite(nv) || nv < 3L) nv <- 6L
     b <- blur_R_step(dt_int, t_coll, n_vert = nv)
     src <- sprintf("data (collection window eco/efo %.0f µs, %d vertices)", 1000 * t_coll, nv)
@@ -554,7 +554,7 @@ trk_tot_cycles <- reactive({
   # Bela computes suggest_split_thresholds AFTER filter_by_length(50), so in
   # adaptive mode only tracks meeting the minimum length count.
   min_len <- if (isTRUE(input$trk_split_adaptive))
-               max(1L, as.integer(input$trk_split_min_len %||% 50L)) else NULL
+               max(1L, as.integer(input$trk_split_min_len %||% TRK_DEFAULTS$trk_split_min_len)) else NULL
   total_cycles(df$tid, df$tim, cyc, sw, min_len)    # R/est_clean.R
 })
 

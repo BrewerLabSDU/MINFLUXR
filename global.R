@@ -27,6 +27,7 @@ source("R/est_hmm.R")        # continuous-time diffusive-state HMM
 source("R/est_percell.R")    # per-cell (per-file) summaries for comparing conditions
 source("R/est_calib.R")      # instrument calibration (prefactor a, wander floor) from an immobile sample
 source("R/smlm_settings.R")  # SMLM settings: one set of defaults for the UI, helpers and reset buttons
+source("R/trk_settings.R")   # Tracking settings: spec, defaults, settings-file block, analysis seed
 # Stateless tracking helpers, moved out of tracking_server().
 source("R/trk_stats.R")        # track-level mean/CI, bootstrap, real-z test, cycle statistics
 source("R/trk_io.R")           # reading one tracking file, selector labels, table coercion
