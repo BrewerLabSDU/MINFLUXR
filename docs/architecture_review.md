@@ -890,9 +890,11 @@ Removed after a reference scan over live code, tests, validation scripts, the
 plugin and the tools (parse tokens, not text search), each candidate checked by
 hand:
 
-- **Never-sourced files**: `deadcode_smlm.R`, `deadcode_tracking.R`,
-  `retired_ui.R`, `retired_tracking_server.R` (1,908 lines). They remain in the
-  git history.
+- **Never-sourced files** (`deadcode_smlm.R`, `deadcode_tracking.R`,
+  `retired_ui.R`, `retired_tracking_server.R`): NOT removed. They turned out to be
+  local files excluded through `.git/info/exclude`, never part of the
+  repository, so they are not dead code in the repo and no git history holds
+  them. Deleting them is the owner's decision.
 - **Outputs with no UI binding**: `download_curvature_table`, `trk_msd_tid_ui`,
   `t_window_ui`, `trk_msd_min_lag_cycle_hint`, `trk_msd_cycle_status`.
 - **State nothing reads**: `smlm_plotted_store` and the observer that filled it,

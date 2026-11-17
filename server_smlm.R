@@ -115,7 +115,7 @@
 ##     when Plot is pressed, not on every keystroke.
 ##   * Multiplex: when active, clustering is forced to run PER CHANNEL so
 ##     molecules from different exchange rounds are never merged.
-##   * Retired code was in deadcode_smlm.R, deleted 2026-11 (in the git history). Several reactives were
+##   * Retired code is in deadcode_smlm.R (a local, untracked file: not in the repository). Several reactives were
 ##     previously defined TWICE at this scope - the later definition silently
 ##     shadowed the earlier, so the first never ran. Before adding a reactive,
 ##     check the name is not already used further down the file.

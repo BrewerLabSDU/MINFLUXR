@@ -37,7 +37,7 @@
 ## REMOVED CODE
 ##   convert_to_qs(), split_by_tid(), na_lines() and even_idx() used to live here
 ##   but had no caller anywhere in the app. They were moved verbatim to
-##   deadcode_tracking.R (2026-07-20), deleted 2026-11; it is in the git history.
+##   deadcode_tracking.R (2026-07-20) (a local, untracked file: not in the repository).
 ## ─────────────────────────────────────────────────────────────────────────────
 
 
