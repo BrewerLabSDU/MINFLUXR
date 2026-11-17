@@ -883,3 +883,35 @@ S2 (segments with D clamped to 0 leave the mixture) matters only for a sample
 with an immobile fraction: in a 50/50 immobile/mobile simulation 55% of the
 immobile segments were dropped and the mixture put the immobile share at 0.35
 instead of 0.53. Not changed.
+
+## 10. Dead code removed (2026-11-17)
+
+Removed after a reference scan over live code, tests, validation scripts, the
+plugin and the tools (parse tokens, not text search), each candidate checked by
+hand:
+
+- **Never-sourced files**: `deadcode_smlm.R`, `deadcode_tracking.R`,
+  `retired_ui.R`, `retired_tracking_server.R` (1,908 lines). They remain in the
+  git history.
+- **Outputs with no UI binding**: `download_curvature_table`, `trk_msd_tid_ui`,
+  `t_window_ui`, `trk_msd_min_lag_cycle_hint`, `trk_msd_cycle_status`.
+- **State nothing reads**: `smlm_plotted_store` and the observer that filled it,
+  `current_pt_idx`, the reactives `msd_min_lag_ms` and `msd_fit_max_ms`, and the
+  flags `trk_len_reset_flag` / `reset_dur_filter_flag` with their nine writes. The
+  sliders snap to the full range through the stored filter (`.filt_value()`),
+  which Reset Ranges clears; the flags no longer took part.
+- **Unused functions**: `read_minflux_csv()`, `collapse_minflux_iterations()`,
+  `filter_by_cell_boundary()` with its helper `.pnpoly_vec()` (helpers_shared.R),
+  and `msd_fit_result()`, `msd_fit_mask()`, used only by `deadcode_tracking.R`.
+  `R/trk_msd_extras.R` kept only `dmax_estimate()` and is now `R/trk_dmax.R`.
+
+Corrections to section 3.4: `slider_guard` is live (the frame-slider observer
+reads it), and `z_rescale_guard` and `tid_reset_flag` are read too.
+
+Kept: `conf_color_map_stored` and `current_tid_idx` (read by the playback code,
+always NULL / 1; removing them means editing the frame builder); the constant
+reactives `deblink_label` / `cluster2_label`; `target_sd_x` / `target_sd_y` in the
+settings spec (older settings files).
+
+Effect: no numeric golden changed; the smoke goldens lost exactly the five
+removed outputs.

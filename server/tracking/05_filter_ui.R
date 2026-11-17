@@ -8,7 +8,7 @@
 ##
 ## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
 ##   DEFINES for other parts:
-##     reset_dur_filter_flag, reset_ranges_trigger, trk_len_reset_flag
+##     reset_ranges_trigger
 ##   READS from other parts:
 ##     01_state_sigma: trk_raw_stats_rv, trk_rechunk_bbox,
 ##                     trk_rechunk_stats_rv, trk_spatial_filter
@@ -70,7 +70,8 @@ output$trk_fluo_ui  <- make_range_ui("fluo",  "FLUO range")
 # So the range always describes the currently PLOTTED data and stops jumping as you
 # drag. The VALUE is PRESERVED (clamped into the new bounds) so a manual minimum
 # (e.g. 50) is not wiped; it snaps to full only on new upload / Reset Ranges /
-# post-rechunk, signalled by trk_len_reset_flag.
+# post-rechunk, because those clear the stored filter (.filt_value then returns the
+# full range).
 output$trk_tid_len_ui <- renderUI({
   reset_ranges_trigger()
   data_ver()                                                           # update at PLOT cadence (upload / Plot Data), not live
@@ -85,7 +86,6 @@ output$trk_tid_len_ui <- renderUI({
   if (!length(lv)) return(NULL)
   bounds <- range(lv, na.rm = TRUE)
   val <- .filt_value("tid_len", bounds)      # stored filter, clamped (full range if none)
-  isolate(trk_len_reset_flag(FALSE))
   numericRangeInput("trk_tid_len", "Trace ID length (localizations)",
                     value = val, min = bounds[1], max = bounds[2])
 })
@@ -140,8 +140,6 @@ reset_tracking_filters <- function() {
   trk_rechunk_bbox(NULL)      # clear locked extent so axes revert to per-TID bbox
   trk_spatial_filter(NULL)    # clear any active spatial crop
   for (k in names(.FILT_IDS)) trk_filt[[k]] <- NULL   # no range filters
-  trk_len_reset_flag(TRUE)    # snap length + duration sliders to full range
-  reset_dur_filter_flag(TRUE)
   reset_ranges_trigger(isolate(reset_ranges_trigger()) + 1L)
 }
 
@@ -150,14 +148,6 @@ observeEvent(input$trk_reset_filters, {
 }, ignoreInit = TRUE)
 
 
-# Legacy re-render flags for the length / duration widgets. The filters themselves
-# live in trk_filt (FILTER SETTINGS above), so a new dataset can no longer receive
-# a stale widget value, and these no longer change what is filtered.
-reset_dur_filter_flag <- reactiveVal(FALSE)
-# Sibling flag for the length slider: when TRUE the slider snaps to the full
-# detected range; otherwise it PRESERVES the user's current value (clamped to the
-# new bounds). Set on new upload / Reset Ranges / after Filter & Rechunk.
-trk_len_reset_flag    <- reactiveVal(FALSE)
 # Incrementing this forces trk_dur_filter_ui to re-render with value = full rng.
 # Used by reset_tracking_filters() as a reliable alternative to updateNumericRangeInput,
 # which does not reliably update renderUI-wrapped widgets.
@@ -169,6 +159,4 @@ reset_ranges_trigger  <- reactiveVal(0L)
 observeEvent(trk_raw_stats_rv(), {
   rs <- trk_raw_stats_rv()
   if (is.null(rs)) return()
-  if (length(rs$tid_length))    trk_len_reset_flag(TRUE)
-  if (length(rs$tid_duration))  reset_dur_filter_flag(TRUE)
 }, ignoreInit = TRUE)

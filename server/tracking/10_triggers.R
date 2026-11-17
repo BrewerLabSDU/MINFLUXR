@@ -40,7 +40,7 @@ plot_trigger      <- reactiveVal(NA)
 # layout_trigger alone isn't enough (it can be set while frames_store is empty).
 trk_plot_ready    <- reactiveVal(FALSE)
 # Always NULL since the Rg/Rmax panel was retired (2026-08-03) - the observer that
-# filled it moved to retired_tracking_server.R. Kept so the playback colour override
+# filled it moved to retired_tracking_server.R, deleted 2026-11 (in the git history). Kept so the playback colour override
 # below needs no change, and so reinstating the retired panel just works.
 conf_color_map_stored    <- reactiveVal(NULL)  # pre-computed tid->hex when conf coloring is on
 cluster_color_map_stored <- reactiveVal(NULL)  # pre-computed tid->hex when MSD cluster coloring is on

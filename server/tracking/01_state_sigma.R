@@ -84,7 +84,6 @@ trk_rechunk_stats_rv  <- reactiveVal(NULL)
 # Full spatial extent of all remaining TIDs after rechunk.
 # list(x = c(xmin, xmax), y = c(ymin, ymax)) - used to lock plot axes.
 trk_rechunk_bbox      <- reactiveVal(NULL)
-current_pt_idx     <- reactiveVal(1L)
 # Current plot axis ranges captured from plotly_relayout - used by "Crop to view".
 # list(x = c(x0, x1), y = c(y0, y1)) or NULL before first zoom interaction.
 trk_zoom_ranges    <- reactiveVal(NULL)

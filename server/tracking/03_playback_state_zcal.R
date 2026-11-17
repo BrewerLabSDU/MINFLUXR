@@ -14,7 +14,6 @@
 ##     01_state_sigma: rv, trk_chunk_pref
 ##     04_datasets_upload: trk_has_data, trk_raw_loaded
 ##     10_triggers: fire_layout
-##     11_data_frames: trk
 ## END INTERFACE
 ## ─────────────────────────────────────────────────────────────────────────────
 
@@ -87,20 +86,6 @@ output$trk_chunk_ui <- renderUI({
   }
 
   NULL
-})
-output$trk_msd_tid_ui <- renderUI({
-  req(isTRUE(input$trk_show_msd), isTRUE(input$trk_msd_show_single))
-  df <- trk(); req(nrow(df) > 0)
-  min_pts <- max(5L, as.integer(input$trk_msd_min_pts %||% 20L))
-  # Only offer TIDs that have enough points to compute MSD
-  counts  <- table(df$tid)
-  tids    <- sort(names(counts[counts >= min_pts]))
-  req(length(tids) > 0)
-  selectizeInput(
-    "trk_msd_tid", "Choose TID for overlay:",
-    choices = tids, selected = tids[1],
-    options = list(maxOptions = 5000)
-  )
 })
 # 2D/3D toggle and the XY/XZ/YZ plane selector are static inputs (ui_tracking.R).
 # They used to be renderUIs that VANISHED on planar data. Two reasons that is

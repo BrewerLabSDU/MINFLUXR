@@ -26,16 +26,14 @@
 ##                                TRUTH shared by the Simulator's forward model
 ##                                and the SMLM tab's inverse GT estimator
 ##   3. Readers, one per format:
-##        CSV  read_minflux_csv()          (pyMINFLUX export)
+##        CSV  read.csv in the upload paths, then canonicalize_minflux_df()
 ##        NPY  read_npy() + read_minflux_npy_as_df()   (pure R, no Python)
 ##        JSON read_minflux_json_as_df()   (Imspector export)
 ##      All of them converge on .minflux_finalize_df(), which applies the shared
 ##      post-processing so every format ends up identical downstream.
-##   4. Format normalisation .... canonicalize_minflux_df(),
-##                                collapse_minflux_iterations()
+##   4. Format normalisation .... canonicalize_minflux_df()
 ##   5. Image overlay ........... make_scale_bar(), apply_background_lut(),
 ##                                auto_align_overlay()
-##   6. Geometry ................ .pnpoly_vec(), filter_by_cell_boundary()
 ##
 ## WHY A HAND-WRITTEN .npy READER
 ##   Abberior also exports .npy, which is far smaller than JSON. Rather than take
@@ -186,15 +184,6 @@ minflux_label_presets <- function() {
   )
 }
 
-# Read MINFLUX CSV (pyMINFLUX format); uses data.table::fread when available
-read_minflux_csv <- function(path) {
-  if (requireNamespace("data.table", quietly = TRUE)) {
-    df <- data.table::fread(path, data.table = FALSE)
-  } else {
-    df <- utils::read.csv(path, stringsAsFactors = FALSE, check.names = FALSE)
-  }
-  df
-}
 
 # -----------------------------------------------------------------------------
 # Pure-R NumPy (.npy) reader - no Python/reticulate dependency.
@@ -829,64 +818,6 @@ read_minflux_npy_as_df <- function(path,
   )
 }
 
-# -- collapse_minflux_iterations() --------------------------------------------
-# GOAL: reduce MINFLUX's multi-stage localization to ONE row per localization.
-#
-# MINFLUX does not measure a position in one shot. It ITERATES: each iteration
-# (`itr`) tightens the doughnut pattern around the molecule, so a single
-# localization event appears in the raw file as several rows - one per
-# iteration, progressively more precise. Downstream we want the final answer,
-# not the refinement history.
-#
-# The grouping key is (tid, gri): one trace, one localization event.
-#
-# Two different rules are needed, which is the subtlety here:
-#   pick_itr()       take the value from the TARGET iteration (the last, most
-#                    refined one). Used for position and most metrics - an
-#                    earlier, coarser iteration would simply be wrong.
-#   latest_finite()  take the value from the highest iteration that actually
-#                    has one. Used for `cfr`, which is not reported at every
-#                    iteration, so demanding the target iteration would give NA.
-#   vld              TRUE if ANY iteration flagged the event valid.
-#
-# df       : raw long-format table with tid, gri, itr (+ the value columns)
-# keep_itr : which iteration is the final one (default 9)
-# returns  : one row per (tid, gri)
-collapse_minflux_iterations <- function(df, keep_itr = 9L) {
-  stopifnot(is.data.frame(df))
-  if (!nrow(df)) return(df)
-
-  if (!all(c("tid","gri","itr") %in% names(df))) {
-    stop("JSON table missing required columns tid/gri/itr for iteration collapsing.")
-  }
-
-  latest_finite <- function(v, itr) {
-    ok <- is.finite(v)
-    if (!any(ok)) return(NA_real_)
-    v[ which.max(itr * ok) ]
-  }
-
-  pick_itr <- function(v, itr, target) {
-    idx <- which(itr == target)
-    if (length(idx)) v[idx[1]] else NA_real_
-  }
-
-  df %>%
-    dplyr::group_by(tid, gri) %>%
-    dplyr::summarise(
-      x   = pick_itr(x,   itr, keep_itr),
-      y   = pick_itr(y,   itr, keep_itr),
-      z   = pick_itr(z,   itr, keep_itr),
-      cfr = latest_finite(cfr, itr),
-      tim = pick_itr(tim, itr, keep_itr),
-      efo = pick_itr(efo, itr, keep_itr),
-      eco = pick_itr(eco, itr, keep_itr),
-      dcr = pick_itr(dcr, itr, keep_itr),
-      sta = pick_itr(sta, itr, keep_itr),
-      vld = any(isTRUE(vld)),
-      .groups = "drop"
-    )
-}
 
 # -- canonicalize_minflux_df() ------------------------------------------------
 # GOAL: accept the many column-naming conventions found in the wild and rename
@@ -1616,7 +1547,7 @@ auto_align_overlay <- function(img, df_xy, px_size,
     data_peaks       = pk_to_df(data_pks_nm),
     img_peaks        = pk_to_df(img_pks_nm),
     # boundary_polygon: data.frame(x, y) in data nm coords; non-NULL only in
-    # boundary mode.  Pass to filter_by_cell_boundary() to keep inside traces.
+    # boundary mode (the polygon is in data nm coordinates).
     boundary_polygon = if (exists("boundary_polygon")) boundary_polygon else NULL,
     # alignment_score: sum of squared residuals from geometric permutation match
     # (foci mode only; lower = all peaks agree more tightly on the same offset)
@@ -1629,46 +1560,4 @@ auto_align_overlay <- function(img, df_xy, px_size,
   )
 }
 
-# -- Vectorised point-in-polygon via ray casting ------------------------------
-# Returns logical vector; TRUE where (test_x[i], test_y[i]) is inside the
-# polygon defined by vertices (poly_x, poly_y).  Polygon is auto-closed.
-.pnpoly_vec <- function(test_x, test_y, poly_x, poly_y) {
-  n      <- length(poly_x)
-  inside <- rep(FALSE, length(test_x))
-  j      <- n
-  for (i in seq_len(n)) {
-    cross  <- ((poly_y[i] > test_y) != (poly_y[j] > test_y)) &
-              (test_x < (poly_x[j] - poly_x[i]) * (test_y - poly_y[i]) /
-                        (poly_y[j] - poly_y[i]) + poly_x[i])
-    inside <- xor(inside, cross)
-    j <- i
-  }
-  inside
-}
 
-# Filter a localisation data frame to keep only traces whose median xy position
-# falls inside the cell boundary polygon returned by
-#   auto_align_overlay(..., mode = "boundary")$boundary_polygon
-# The polygon must already be in data nm coordinates.
-# Returns df unchanged if boundary_polygon is NULL or has fewer than 3 vertices.
-filter_by_cell_boundary <- function(df, boundary_polygon) {
-  if (is.null(boundary_polygon) || !is.data.frame(boundary_polygon) ||
-      nrow(boundary_polygon) < 3L)                    return(df)
-  if (!all(c("x", "y", "tid") %in% names(df)))       return(df)
-
-  tid_med <- df %>%
-    dplyr::group_by(tid) %>%
-    dplyr::summarise(
-      mx = stats::median(x, na.rm = TRUE),
-      my = stats::median(y, na.rm = TRUE),
-      .groups = "drop"
-    ) %>%
-    dplyr::filter(is.finite(mx), is.finite(my))
-
-  if (!nrow(tid_med)) return(df)
-
-  inside    <- .pnpoly_vec(tid_med$mx, tid_med$my,
-                           boundary_polygon$x, boundary_polygon$y)
-  keep_tids <- tid_med$tid[inside]
-  dplyr::filter(df, tid %in% keep_tids)
-}

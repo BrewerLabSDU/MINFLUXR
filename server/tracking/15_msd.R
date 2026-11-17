@@ -14,8 +14,7 @@
 ##     msd_unified_fit, msd_unified_modelfit, trk_unified_tdiff
 ##   READS from other parts:
 ##     01_state_sigma: trk_sigma_loc_eff, trk_sigma_loc_rv, trk_sigma_loc_src
-##     07_cycle_time_sequence: trk_blur, trk_cluster_cycle, trk_cycle_time,
-##                             trk_hw_cycle_time
+##     07_cycle_time_sequence: trk_blur, trk_cluster_cycle, trk_cycle_time
 ##     11_data_frames: trk
 ##     13_dt_msd_clusters: msd_cluster_rv, msd_pertk_fits
 ## END INTERFACE
@@ -255,15 +254,6 @@ output$trk_msd_cluster_plot <- renderPlotly({
            toImageButtonOptions = list(format = "svg", filename = "msd_cluster_scatter"))
 })
 
-# ---- ms hint for the standard MSD cycle-based min-lag input -----------------
-# Input is in cycles; show the ms equivalent at the current cycle time.
-output$trk_msd_min_lag_cycle_hint <- renderUI({
-  t_c <- trk_cycle_time()
-  v   <- suppressWarnings(as.numeric(input$trk_msd_min_lag_cyc))
-  if (!is.finite(t_c) || t_c <= 0 || !is.finite(v) || v <= 0) return(NULL)
-  tags$p(style = "font-size:0.81em; color:#2070a0; margin:2px 0;",
-         sprintf("\u2248 %.4g ms  (at %.4g ms/cycle)", v * t_c, t_c))
-})
 
 # Sync button: make the standard MSD reproduce the Advanced (cycle) MSD as
 # closely as possible.  Auto-detects the cycle time from the modal \u0394t (same
@@ -298,23 +288,6 @@ observeEvent(input$trk_msd_sync_cycle, {
     type = "message", duration = 9
   )
 }, ignoreInit = TRUE)
-
-# ---- Advanced MINFLUX MSD: cycle-based (Vogler et al. 2025) -----------------
-# Resolved cycle-time status shown inside the Advanced MSD panel
-output$trk_msd_cycle_status <- renderUI({
-  req(isTRUE(input$trk_msd_advanced))
-  tc  <- trk_cycle_time()
-  if (!is.finite(tc) || tc <= 0)
-    return(tags$p(style = "font-size:0.82em; color:#888; margin:2px 0;",
-                  "Cycle time: not yet determined."))
-  hw  <- trk_hw_cycle_time()
-  man <- suppressWarnings(as.numeric(input$trk_msd_cycle_ms))
-  src <- if (is.finite(hw) && hw > 0) "hardware model"
-         else if (is.finite(man) && man > 0) "manual override"
-         else "modal \u0394t (data)"
-  tags$p(style = "font-size:0.83em; color:#2070a0; margin:2px 0;",
-         sprintf("Cycle time in use: %.4g ms (source: %s)", tc, src))
-})
 
 
 # ============================================================================

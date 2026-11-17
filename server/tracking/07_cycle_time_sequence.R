@@ -15,7 +15,7 @@
 ##   READS from other parts:
 ##     01_state_sigma: rv, trk_raw_stats_rv, trk_rechunk_stats_rv, tsa_ran
 ##     04_datasets_upload: trk_has_data, trk_raw_df, trk_raw_original
-##     05_filter_ui: reset_dur_filter_flag, reset_ranges_trigger
+##     05_filter_ui: reset_ranges_trigger
 ##     06_filter_pipeline: .filt_value, trk_end_trimmed_d, trk_gap_split,
 ##                         trk_gap_split_d, trk_len_filtered,
 ##                         trk_quality_filtered_d, trk_spatial_filtered
@@ -149,23 +149,6 @@ trk_cycle_time <- reactive({
   trk_pipeline_modal_dt()
 })
 
-# Standard-MSD fit window bounds, entered in CYCLES, converted to ms via the
-# cycle time (Vogler's fit_limits, default 5–50).  0 means "off".
-msd_min_lag_ms <- reactive({
-  cyc <- suppressWarnings(as.numeric(input$trk_msd_min_lag_cyc))
-  tc  <- trk_cycle_time()
-  if (length(cyc) == 0 || !is.finite(cyc) || cyc <= 0 || !is.finite(tc) || tc <= 0) return(0)
-  cyc * tc
-})
-# Upper end of the same fit window, also entered in CYCLES and converted to ms.
-# Same "0 means off" convention as msd_min_lag_ms above.
-msd_fit_max_ms <- reactive({
-  cyc <- suppressWarnings(as.numeric(input$trk_msd_fit_max_cyc))   # user value, in cycles
-  tc  <- trk_cycle_time()                                          # ms per cycle
-  # Any missing/nonsensical input (or unknown cycle time) disables the bound.
-  if (length(cyc) == 0 || !is.finite(cyc) || cyc <= 0 || !is.finite(tc) || tc <= 0) return(0)
-  cyc * tc                                                         # cycles -> milliseconds
-})
 
 # Status / cross-check line shown in the Acquisition Parameters panel
 output$trk_cycle_time_status <- renderUI({
@@ -630,7 +613,8 @@ output$trk_lifetime_stat <- renderUI({
 # Ranges), NOT live. So the range describes the currently PLOTTED data and stops
 # jumping as sliders move. The VALUE is PRESERVED (clamped into the new bounds) so a
 # manual minimum (e.g. 50 ms) sticks; it snaps to full only on new upload / Reset
-# Ranges / post-rechunk, signalled by reset_dur_filter_flag.
+# Ranges / post-rechunk, because those clear the stored filter (.filt_value then
+# returns the full range).
 output$trk_dur_filter_ui <- renderUI({
   reset_ranges_trigger()
   data_ver()                                                           # update at PLOT cadence (upload / Plot Data), not live
@@ -647,7 +631,6 @@ output$trk_dur_filter_ui <- renderUI({
   if (!length(dv)) return(NULL)
   bounds <- range(dv, na.rm = TRUE)
   val <- .filt_value("dur", bounds)          # stored filter, clamped (full range if none)
-  shiny::isolate(reset_dur_filter_flag(FALSE))
   numericRangeInput("trk_dur_filter", "Trace duration filter (ms)",
                     value = val, min = bounds[1], max = bounds[2])
 })

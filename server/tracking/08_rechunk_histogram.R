@@ -14,7 +14,6 @@
 ##     01_state_sigma: .tids_per_chunk, rechunk_request, trk_chunk_pref,
 ##                     trk_raw_stats_rv, trk_rechunk_bbox,
 ##                     trk_rechunk_stats_rv, trk_spatial_filter
-##     05_filter_ui: reset_dur_filter_flag, trk_len_reset_flag
 ##     06_filter_pipeline: trk_dur_filtered_d, trk_filter_params
 ##     07_cycle_time_sequence: trk_cluster_cycle, trk_cycle_time
 ##     10_triggers: trk_data_key
@@ -149,8 +148,6 @@ observeEvent(rechunk_request(), {
     # Flags stay TRUE so the length/duration sliders snap to the new full range
     # on their next (data-driven) re-render - no forced re-render here, which
     # would fire during the async checkbox round-trip while the split is still on.
-    trk_len_reset_flag(TRUE)
-    reset_dur_filter_flag(TRUE)
 
     n_tids <- length(unique(df_all$tid))
     n_new  <- nrow(readr::read_csv(manf_new, show_col_types = FALSE))

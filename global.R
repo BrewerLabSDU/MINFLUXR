@@ -31,7 +31,7 @@ source("R/smlm_settings.R")  # SMLM settings: one set of defaults for the UI, he
 source("R/trk_stats.R")        # track-level mean/CI, bootstrap, real-z test, cycle statistics
 source("R/trk_io.R")           # reading one tracking file, selector labels, table coercion
 source("R/trk_playback.R")     # play-loop timing, colour scales, dwell heatmap
-source("R/trk_msd_extras.R")   # MSD fit-window mask, nls model fit, D_max
+source("R/trk_dmax.R")         # the trackable-diffusion ceiling D_max
 source("R/trk_geometry.R")     # cell-geometry labels
 source("R/est_transport.R")    # per-track speed, drift velocity, local alpha
 source("R/est_directionality.R")  # turning angles, direction autocorrelation

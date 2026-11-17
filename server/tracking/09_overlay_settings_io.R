@@ -13,7 +13,7 @@
 ##   READS from other parts:
 ##     01_state_sigma: trk_raw_stats_rv, trk_rechunk_stats_rv,
 ##                     trk_spatial_filter
-##     03_playback_state_zcal: is_simul, trk_z_applied
+##     03_playback_state_zcal: trk_z_applied
 ##     04_datasets_upload: trk_view_base
 ##     05_filter_ui: reset_ranges_trigger
 ##     06_filter_pipeline: .FILT_IDS, trk_filt, trk_spatial_filtered
@@ -522,16 +522,3 @@ local({
 })
 
 
-output$t_window_ui <- renderUI({
-  req(!is.na(layout_trigger()))
-  df <- trk(); req(nrow(df) > 0)
-  tcol <- if (isTRUE(is_simul())) "tim0" else "tim"
-  v <- df[[tcol]]; v <- v[is.finite(v)]
-  if (!length(v)) return(NULL)
-  rng <- range(v)
-  numericRangeInput(
-    "t_window",
-    paste0("Time window on ", tcol, " [", signif(rng[1], 4), ", ", signif(rng[2], 4), "]"),
-    value = rng, min = rng[1], max = rng[2]
-  )
-})

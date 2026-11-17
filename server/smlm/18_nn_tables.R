@@ -233,7 +233,6 @@ secondary_nn_lines <- reactive({
 })
 
 
-
 # 3) Plane distance table ------------ 
 output$download_plane_distance_table <- downloadHandler(
   filename = function() paste0("cluster2_xy_plane_distances_", Sys.Date(), ".xlsx"),
@@ -280,22 +279,6 @@ output$download_nn_table2 <- downloadHandler(
   contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
 
-# 6) Curvature table -----------------
-output$download_curvature_table <- downloadHandler(
-  filename = function() paste0("cluster2_curvature_", Sys.Date(), ".xlsx"),
-  content  = function(file) {
-    df <- plottable_data()
-    curvature_table <- build_curvature_table(df)
-    if (nrow(curvature_table) == 0) stop("No curvature data to export.")
-    openxlsx::write.xlsx(
-      x         = curvature_table,
-      file      = file,
-      sheetName = "Curvature",
-      rowNames  = FALSE
-    )
-  },
-  contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
 df_full_raw <- reactive({
   data()
 })

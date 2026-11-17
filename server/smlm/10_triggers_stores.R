@@ -14,7 +14,6 @@
 ##     iso_mesh_cache, plot_trigger, smlm_diag, smlm_diag_mats
 ##   READS from other parts:
 ##     01_view_upload: uploaded_df_rv
-##     17_plottable_data: plottable_data
 ## END INTERFACE
 ## ─────────────────────────────────────────────────────────────────────────────
 
@@ -62,9 +61,6 @@ iso_geom <- eventReactive(plot_trigger(), {
 })
 output$cluster2_iso_status <- renderUI(iso_status_ui(cluster2_iso_diag()))
 cluster2_table_store <- reactiveVal(NULL)
-# Cache of clustered data per file - populated whenever a file is plotted.
-# Enables batch analysis across all previously-plotted files.
-smlm_plotted_store <- reactiveVal(list())
 shinyjs::hide("scatter2D")
 observeEvent(plot_trigger(), {
   shinyjs::show("scatter2D")
@@ -87,17 +83,6 @@ observeEvent(input$enable_clustering, {
   plot_trigger(Sys.time())
 }, ignoreInit = TRUE)
 fit_log_rv <- reactiveVal("")
-
-# Keep smlm_plotted_store in sync: every time a file is plotted, cache its
-# clustered data so batch analysis can iterate all plotted files.
-observeEvent(plottable_data(), {
-  df  <- tryCatch(plottable_data(), error = function(e) NULL)
-  nm  <- isolate(input$active_file) %||% isolate(input$file)[[1]]
-  if (is.null(df) || !nrow(df) || is.null(nm)) return()
-  store <- smlm_plotted_store()
-  store[[nm]] <- df
-  smlm_plotted_store(store)
-}, ignoreNULL = TRUE)
 
 
 output$fit_log <- renderText({
