@@ -11,7 +11,7 @@
 ##   DEFINES for other parts:
 ##     (nothing)
 ##   READS from other parts:
-##     01_state_sigma: trk_sigma_loc_eff
+##     01_state_sigma: .sigma_stamp, trk_sigma_loc_eff
 ##     06_filter_pipeline: trk_spatial_filtered
 ##     07_cycle_time_sequence: trk_blur, trk_cycle_time
 ##     10_triggers: has_z
@@ -125,6 +125,9 @@ cpd_segments_rv <- eventReactive(input$trk_cpd_compute, {
     !is.null(result) && nrow(result) >= 3L,
     "No segments found - try lowering Min segment length."
   ))
+  attr(result, "sigma_info") <- .sigma_stamp(if (sub_noise_cpd) sig_cpd else NA_real_,
+                                             used = isTRUE(input$trk_cpd_sub_noise),
+                                             note = if (!isTRUE(input$trk_cpd_sub_noise)) "noise subtraction is off" else NULL)
   result
 }, ignoreNULL = TRUE)
 

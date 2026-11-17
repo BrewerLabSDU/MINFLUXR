@@ -121,3 +121,36 @@ cycle_class_counts <- function(vec, t_c, max_disp = 20L) {
        n_total = n_total, n_integ = n_integ, n_dark_int = n_dark_int,
        dark_cycles_total = dark_cycles_total, frac_integ = frac_integ)
 }
+
+# ── sigma_used_text() ─────────────────────────────────────────────────────────
+# GOAL: one sentence saying which localization precision a panel used and where
+# it came from, so a result that depends on sigma (JDD, D-map, change-point, HMM,
+# the confinement and displacement nulls, directionality, speed) shows it. The
+# sigma is the value the panel read WHEN IT RAN, not the current one.
+# info : list(sigma (nm), source, role, used, note, a, a_calibrated, profile) as
+#        built by .sigma_stamp() in server/tracking/01_state_sigma.R
+#   role         "subtracted" (a noise term is removed) or "noise floor" (used
+#                only to flag steps or set a threshold)
+#   used         FALSE when the panel's own switch turned the correction off
+#   a, a_calibrated, profile : the photon-budget prefactor, whether it was set
+#                (typed or from a calibration profile) and the profile's name
+# RETURNS a character string, or NULL when info is NULL.
+sigma_used_text <- function(info) {
+  if (is.null(info)) return(NULL)
+  role <- info$role %||% "subtracted"
+  if (!isTRUE(info$used))
+    return(sprintf("\u03c3_loc not %s: %s.", if (role == "subtracted") "subtracted" else "used",
+                   info$note %||% "switched off in this panel"))
+  if (!is.finite(info$sigma) || info$sigma <= 0)
+    return(sprintf("\u03c3_loc not %s: no value is set. Run Data Quality & Calibration or enter \u03c3_loc.",
+                   if (role == "subtracted") "subtracted" else "used"))
+  src <- info$source %||% "not set"
+  detail <- if (identical(src, "photon budget")) {
+    if (isTRUE(info$a_calibrated))
+      sprintf("photon budget, prefactor a = %.2f%s", info$a,
+              if (!is.null(info$profile) && nzchar(info$profile)) sprintf(" from profile '%s'", info$profile) else "")
+    else sprintf("photon budget, prefactor a = %.2f, uncalibrated (ideal estimator; calibrate on an immobile sample)", info$a)
+  } else src
+  sprintf("\u03c3_loc %s: %.2f nm (%s)%s.", if (role == "subtracted") "subtracted" else "used as the noise floor",
+          info$sigma, detail, if (!is.null(info$note) && nzchar(info$note)) paste0("; ", info$note) else "")
+}

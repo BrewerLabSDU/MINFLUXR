@@ -71,6 +71,19 @@ test_that("Tracking tab: every analysis panel reproduces its golden numbers", {
     press(trk_show_dmap = TRUE, trk_dmap_run = 1)
     res$dmap        <- .grab(dmap_bundle())
     res$dmax        <- .grab(dmax_estimate(trk(), 100.8, 0.05))
+    # Each sigma-dependent panel records the sigma it used. After one press of
+    # Estimate sigma_loc that is the photon-budget value, uncalibrated here.
+    for (b in c("jdd_bundle", "dmap_bundle", "cpd_segments_rv", "hmm_bundle", "conf_ci_bundle",
+                "trk_disp_bundle", "dir_bundle", "trk_export_summary")) {
+      si <- attr(get(b)(), "sigma_info")
+      expect_false(is.null(si), info = b)
+      expect_equal(si$sigma, trk_sigma_loc_eff(), info = b)
+      expect_identical(si$source, "photon budget", info = b)
+      expect_false(si$a_calibrated, info = b)
+    }
+    for (o in paste0(c("trk_jdd", "trk_dmap", "trk_cpd", "trk_hmm", "trk_conf_ci", "trk_disp", "trk_dir",
+                       "trk_speed"), "_sigma_used"))
+      expect_match(paste(unlist(output[[o]]), collapse = ""), "4.72 nm (photon budget", fixed = TRUE, info = o)
   })
   res <- as.list(res)
   expect_identical(.golden_errors(res), character(0))

@@ -10,7 +10,7 @@
 ##   DEFINES for other parts:
 ##     (nothing)
 ##   READS from other parts:
-##     01_state_sigma: trk_sigma_loc_eff
+##     01_state_sigma: .sigma_stamp, trk_sigma_loc_eff
 ##     07_cycle_time_sequence: trk_cycle_time
 ##     11_data_frames: trk
 ## END INTERFACE
@@ -107,6 +107,8 @@ dir_bundle <- eventReactive(input$trk_dir_run, {
     res <- dir_compute(df, t_c, sig_dir, min_pts, max_dark, max_lag = 20L, progress = incProgress)
     shiny::validate(shiny::need(!is.null(res),
       "Too few usable steps - lower 'Min points per TID', raise 'Max dark cycles', or relax filters."))
+    attr(res, "sigma_info") <- .sigma_stamp(sig_dir, role = "noise floor",
+                                            note = "steps shorter than 2\u03c3 are counted, not removed")
     res
   })  # withProgress
 })

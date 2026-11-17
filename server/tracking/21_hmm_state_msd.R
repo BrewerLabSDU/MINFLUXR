@@ -11,7 +11,7 @@
 ##   DEFINES for other parts:
 ##     (nothing)
 ##   READS from other parts:
-##     01_state_sigma: trk_sigma_loc_eff, trk_sigma_loc_src
+##     01_state_sigma: .sigma_stamp, trk_sigma_loc_eff, trk_sigma_loc_src
 ##     02_data_quality_cve: trk_cve_bundle
 ##     06_filter_pipeline: .a_in_use
 ##     07_cycle_time_sequence: trk_blur, trk_cluster_cycle, trk_cycle_time
@@ -197,14 +197,16 @@ hmm_bundle <- eventReactive(input$trk_hmm_run, {
   for (k in seq_len(K - 1L)) if (abs(fit$D[k + 1L] / fit$D[k] - 1) < 0.05) same_D[c(k, k + 1L)] <- TRUE
   resolv$same_D <- same_D
 
-  list(K = K, D_vals = fit$D, fracs = fit$pi,
+  structure(list(K = K, D_vals = fit$D, fracs = fit$pi,
        P_cycle = .expm_small(fit$Q * t_c), Qrate = fit$Q, dwell_ms = fit$dwell_ms,
        fit = fit, boot = boot, bic_other = bic_other, n_tracks_all = n_sub_tracks,
        seg_list = seg_list, n_tracks = fit$n_tracks, n_steps = fit$n_steps,
        dt_med_ms = dt_med, t_cycle_ms = t_c, R_abs = R_abs,
        sigma_loc_nm = sig_eff, sigma_mode = sigma_mode,
        D_noise = D_noise, noise_state = fit$D <= D_noise, resolv = resolv,
-       norm_dt = TRUE)
+       norm_dt = TRUE),
+    # src is the app-wide source, or "photon budget" computed in this panel
+    sigma_info = .sigma_stamp(sig_eff, src, note = sigma_mode))
 })
 
 output$trk_hmm_params_plot <- renderPlotly({

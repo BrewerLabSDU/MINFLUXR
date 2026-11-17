@@ -9,14 +9,14 @@
 ##
 ## INTERFACE (generated: Rscript tools/server_map.R --headers; do not edit by hand)
 ##   DEFINES for other parts:
-##     .continuity_scores, .tids_per_chunk, current_tid_idx, is_playing,
-##     rechunk_request, rv, slider_guard, speed_ran, tick, trace_map,
-##     trk_chunk_pref, trk_raw_stats_rv, trk_rechunk_bbox,
+##     .continuity_scores, .sigma_stamp, .tids_per_chunk, current_tid_idx,
+##     is_playing, rechunk_request, rv, slider_guard, speed_ran, tick,
+##     trace_map, trk_chunk_pref, trk_raw_stats_rv, trk_rechunk_bbox,
 ##     trk_rechunk_stats_rv, trk_sigma_loc_cve, trk_sigma_loc_eff,
 ##     trk_sigma_loc_photon, trk_sigma_loc_rv, trk_sigma_loc_src,
 ##     trk_spatial_filter, trk_zoom_ranges, tsa_ran
 ##   READS from other parts:
-##     06_filter_pipeline: bump_clean
+##     06_filter_pipeline: .a_in_use, bump_clean
 ## END INTERFACE
 ## ─────────────────────────────────────────────────────────────────────────────
 
@@ -152,6 +152,25 @@ trk_sigma_loc_src <- reactive({
   else if (is.finite(trk_sigma_loc_rv()))  "MSD fit"
   else "not set"
 })
+
+# GOAL: the record of the sigma_loc one panel used, taken inside its Run handler
+# so the panel can later say what it subtracted (sigma_used_text(), R/trk_stats.R;
+# rendered by server/tracking/26_sigma_used.R). Attached to the panel's result as
+# attribute "sigma_info", which leaves the result itself unchanged.
+#   sigma  : the value the panel used (nm); NA when none
+#   source : where it came from; NULL = the app-wide source now in force
+#   role   : "subtracted" or "noise floor"
+#   used   : FALSE when the panel's own switch turned the correction off
+.sigma_stamp <- function(sigma, source = NULL, role = "subtracted", used = TRUE, note = NULL) {
+  isolate({
+    pat <- input$trk_tcp_pattern %||% TCP_PATTERN_DEFAULT
+    typed <- suppressWarnings(as.numeric(input$trk_crlb_pref))
+    list(sigma = if (length(sigma)) as.numeric(sigma[1]) else NA_real_,
+         source = source %||% trk_sigma_loc_src(), role = role, used = used, note = note,
+         a = .a_in_use(pat), a_calibrated = length(typed) == 1L && is.finite(typed) && typed > 0,
+         profile = input$trk_cal_profile %||% "")
+  })
+}
 
 
 # Per-track cycle-CONTINUITY score. A step spanning k acquisition cycles (k=1 =

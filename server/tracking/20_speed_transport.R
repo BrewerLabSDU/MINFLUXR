@@ -11,7 +11,7 @@
 ##   DEFINES for other parts:
 ##     (nothing)
 ##   READS from other parts:
-##     01_state_sigma: speed_ran, trk_sigma_loc_eff
+##     01_state_sigma: .sigma_stamp, speed_ran, trk_sigma_loc_eff
 ##     11_data_frames: trk
 ## END INTERFACE
 ## ─────────────────────────────────────────────────────────────────────────────
@@ -216,6 +216,9 @@ trk_export_summary <- eventReactive(input$trk_speed_run, {
   }))
   out <- do.call(rbind, rows)
   shiny::validate(shiny::need(!is.null(out) && nrow(out) > 0, "No tracks produced a drift-velocity curve."))
+  v_panel <- suppressWarnings(as.numeric(input$trk_speed_sigma_nm %||% 0))
+  attr(out, "sigma_info") <- .sigma_stamp(if (sigma_nm > 0) sigma_nm else NA_real_, role = "noise floor",
+    source = if (is.finite(v_panel) && v_panel > 0) "value entered in this panel" else NULL)
   out
 })
 

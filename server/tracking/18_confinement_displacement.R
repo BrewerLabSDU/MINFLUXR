@@ -11,7 +11,7 @@
 ##   DEFINES for other parts:
 ##     (nothing)
 ##   READS from other parts:
-##     01_state_sigma: trk_sigma_loc_eff, trk_sigma_loc_src
+##     01_state_sigma: .sigma_stamp, trk_sigma_loc_eff, trk_sigma_loc_src
 ##     02_data_quality_cve: trk_cve_bundle
 ##     07_cycle_time_sequence: trk_blur, trk_cycle_time
 ##     11_data_frames: trk
@@ -150,6 +150,8 @@ conf_ci_bundle <- eventReactive(input$trk_conf_ci_run, {
   attr(pt, "T_med") <- T_med; attr(pt, "null") <- nul; attr(pt, "nsim") <- nsim
   attr(pt, "D_matched") <- length(D_grid) > 1L
   attr(pt, "x_noise") <- x_of(D_use)
+  attr(pt, "sigma_info") <- .sigma_stamp(sig, note = if (length(sig_null) > 1L)
+    "the null resamples the per-localization photon values" else NULL)
   pt
 })
 
@@ -376,6 +378,7 @@ trk_disp_bundle <- eventReactive(input$trk_disp_run, {
   attr(res, "d_mot") <- d_mot; attr(res, "D_mot") <- D_mot
   attr(res, "d_lab") <- d_lab
   attr(res, "D_cve") <- D_cve; attr(res, "D_msd") <- D_msd
+  attr(res, "sigma_info") <- .sigma_stamp(sig)
   res
 })
 

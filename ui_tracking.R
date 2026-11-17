@@ -1075,7 +1075,8 @@ tracking_ui <- fluidPage(
           conditionalPanel(
             condition = "input.trk_show_conf == true",
             plotlyOutput("trk_conf_ci_plot", height = "380px"),
-            uiOutput("trk_conf_ci_summary")
+            uiOutput("trk_conf_ci_summary"),
+           uiOutput("trk_conf_ci_sigma_used")
           )
         )
       ),
@@ -1112,7 +1113,8 @@ tracking_ui <- fluidPage(
           conditionalPanel(
             condition = "input.trk_show_cpd == true",
             plotlyOutput("trk_cpd_hist", height = "320px"),
-            uiOutput("trk_cpd_summary")
+            uiOutput("trk_cpd_summary"),
+           uiOutput("trk_cpd_sigma_used")
           )
         )
       ),
@@ -1180,7 +1182,8 @@ tracking_ui <- fluidPage(
             plotlyOutput("trk_jdd_plot", height = "380px"),
             helpText(style = "font-size:0.82em; color:#666;",
               "Bars: step sizes pooled over all tracks. Dashed: fitted components. Red: their sum."),
-            uiOutput("trk_jdd_estimates")
+            uiOutput("trk_jdd_estimates"),
+           uiOutput("trk_jdd_sigma_used")
           )
         )
       ),
@@ -1246,7 +1249,8 @@ tracking_ui <- fluidPage(
               "Grey band: 5th\u201395th percentile of free diffusion. ",
               tags$b(style = "color:#2c7fb8;", "Blue"), ": sub-diffusive. ",
               tags$b(style = "color:#e31a1c;", "Red"), ": directed. About 5% of free tracks fall in each tail."),
-            uiOutput("trk_disp_summary")
+            uiOutput("trk_disp_summary"),
+           uiOutput("trk_disp_sigma_used")
           )
         )
       ),
@@ -1286,7 +1290,8 @@ tracking_ui <- fluidPage(
             plotlyOutput("trk_dir_autocorr_plot", height = "300px"),
             helpText(style = "font-size:0.82em; color:#666;",
               "Positive and slowly decaying: directed. A small first-lag dip, then about zero: Brownian."),
-            uiOutput("trk_dir_summary")
+            uiOutput("trk_dir_summary"),
+           uiOutput("trk_dir_sigma_used")
           )
         )
       ),
@@ -1338,7 +1343,8 @@ tracking_ui <- fluidPage(
             plotlyOutput("trk_hmm_example_plot", height = "400px"),
             helpText(style = "font-size:0.82em; color:#666;",
               "The longest tracks, coloured by most likely state."),
-            uiOutput("trk_hmm_summary")
+            uiOutput("trk_hmm_summary"),
+           uiOutput("trk_hmm_sigma_used")
           )
         )
       ),
@@ -1449,7 +1455,7 @@ tracking_ui <- fluidPage(
           conditionalPanel(
             condition = "input.trk_show_speed == true",
             tags$div(class = "well well-sm", style = "margin-bottom:6px;",
-                     uiOutput("trk_export_summary_txt")),
+                     uiOutput("trk_export_summary_txt"), uiOutput("trk_speed_sigma_used")),
             plotlyOutput("trk_export_corrob", height = "330px"),
             helpText(style = "font-size:0.82em; color:#666;",
               "One dot per candidate segment: where it starts along the track, against its integrated ",
@@ -1517,7 +1523,8 @@ tracking_ui <- fluidPage(
             plotlyOutput("trk_dmap_plot", height = "520px"),
             helpText(style = "font-size:0.82em; color:#666;",
               "Local D in nm\u00b2/ms, cool for slow and warm for fast. Blank: too few steps."),
-            uiOutput("trk_dmap_summary")
+            uiOutput("trk_dmap_summary"),
+           uiOutput("trk_dmap_sigma_used")
           )
         )
       ),

@@ -10,7 +10,7 @@
 ##   DEFINES for other parts:
 ##     (nothing)
 ##   READS from other parts:
-##     01_state_sigma: trk_sigma_loc_eff
+##     01_state_sigma: .sigma_stamp, trk_sigma_loc_eff
 ##     07_cycle_time_sequence: trk_blur, trk_cycle_time
 ##     11_data_frames: trk
 ## END INTERFACE
@@ -104,6 +104,8 @@ dmap_bundle <- eventReactive(input$trk_dmap_run, {
                         R_abs = trk_blur()$R_abs)
   })
   shiny::validate(shiny::need(is.null(res$error), res$error %||% ""))
+  attr(res, "sigma_info") <- .sigma_stamp(sig_use, used = isTRUE(input$trk_dmap_sub_noise),
+                                          note = if (!isTRUE(input$trk_dmap_sub_noise)) "noise subtraction is off" else NULL)
   res
 })
 

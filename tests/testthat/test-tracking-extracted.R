@@ -103,3 +103,22 @@ test_that("per-track MSD fits recover D on free diffusion", {
   expect_lt(abs(stats::median(pt$pertrack$conf_index, na.rm = TRUE) - 1), 0.2)
   expect_true(all(pt$per_D > 0))
 })
+
+# CLAIM: the sigma line says what was used, where it came from, and flags the
+# cases that deserve a second look (switched off, unset, uncalibrated prefactor).
+test_that("sigma_used_text names the value, the source and an uncalibrated prefactor", {
+  base <- list(sigma = 4.716, source = "photon budget", role = "subtracted", used = TRUE,
+               a = sqrt(8), a_calibrated = FALSE, profile = "")
+  t <- sigma_used_text(base)
+  expect_match(t, "subtracted: 4.72 nm", fixed = TRUE)
+  expect_match(t, "a = 2.83, uncalibrated", fixed = TRUE)
+  expect_match(sigma_used_text(modifyList(base, list(a = 3.93, a_calibrated = TRUE, profile = "Hex100_L101"))),
+               "a = 3.93 from profile 'Hex100_L101'", fixed = TRUE)
+  expect_match(sigma_used_text(modifyList(base, list(source = "value entered in this panel"))),
+               "(value entered in this panel)", fixed = TRUE)
+  expect_match(sigma_used_text(modifyList(base, list(used = FALSE, note = "noise subtraction is off"))),
+               "not subtracted: noise subtraction is off", fixed = TRUE)
+  expect_match(sigma_used_text(modifyList(base, list(sigma = NA_real_))), "no value is set", fixed = TRUE)
+  expect_match(sigma_used_text(modifyList(base, list(role = "noise floor"))), "used as the noise floor", fixed = TRUE)
+  expect_null(sigma_used_text(NULL))
+})

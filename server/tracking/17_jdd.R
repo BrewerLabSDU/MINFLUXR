@@ -10,7 +10,7 @@
 ##   DEFINES for other parts:
 ##     jdd_bundle
 ##   READS from other parts:
-##     01_state_sigma: trk_sigma_loc_eff
+##     01_state_sigma: .sigma_stamp, trk_sigma_loc_eff
 ##     07_cycle_time_sequence: trk_blur, trk_cycle_time
 ##     11_data_frames: trk
 ## END INTERFACE
@@ -106,9 +106,12 @@ jdd_bundle <- eventReactive(input$trk_jdd_run, {
   subsamp_n <- suppressWarnings(as.integer(input$trk_jdd_subsamp_n))
   if (!is.finite(min_dt)    || min_dt    <= 0) min_dt    <- 0
   if (!is.finite(max_dt)    || max_dt    <= 0) max_dt    <- Inf
+  sig_info <- if (is.finite(sigma_loc) && sigma_loc > 0) .sigma_stamp(sigma_loc, "value entered in this panel")
+              else NULL
   if (!is.finite(sigma_loc) || sigma_loc <= 0) {   # 0 = auto from app-wide σ_loc
     s_app <- tryCatch(trk_sigma_loc_eff(), error = function(e) NA_real_)
     sigma_loc <- if (is.finite(s_app) && s_app > 0) s_app else 0
+    sig_info <- .sigma_stamp(if (sigma_loc > 0) sigma_loc else NA_real_)
   }
   if (!is.finite(bin_width) || bin_width <= 0) bin_width <- 1
   if (!is.finite(subsamp_n) || subsamp_n <  2) subsamp_n <- 4L
@@ -135,13 +138,14 @@ jdd_bundle <- eventReactive(input$trk_jdd_run, {
                 R_abs = trk_blur()$R_abs,
                 progress = function(f) incProgress(f, detail = "fitting jump-distance mixture"))
 
-  list(mids = jf$mids, dens = jf$dens, sigs = jf$sigs, ws = jf$ws, D_vals = jf$D_vals,
+  structure(list(mids = jf$mids, dens = jf$dens, sigs = jf$sigs, ws = jf$ws, D_vals = jf$D_vals,
        n_comp = n_comp, norm_dt = norm_dt, n_jumps = length(cj$jumps),
        use_z = use_z_jdd, d_fit = jf$d_fit, dt0 = jf$dt0, inv_dt = jf$inv_dt, sigma_loc = sigma_loc,
        r_noise = jf$r_noise, R_abs = trk_blur()$R_abs,
        step_mode = step_mode, integrated_only = integ_only, t_cycle = t_c_jdd,
        min_dt_used = if (min_dt > 0) min_dt else NA_real_,
-       max_dt_used = if (is.finite(max_dt)) max_dt else NA_real_)
+       max_dt_used = if (is.finite(max_dt)) max_dt else NA_real_),
+    sigma_info = sig_info)
   })  # withProgress
 })
 
