@@ -193,7 +193,7 @@ observeEvent(input$trk_load_filter_settings, {
     fire_frames()
   }
 
-  # ── The settings block (files from v0.8 on): every data-affecting setting ──
+  # ── The settings block (files from v0.7.1 on): every data-affecting setting ──
   # Restored last, so where a key appears both here and at the top level the
   # block wins. The calibration profile is not reselected: selecting it copies
   # the profile's prefactor, pattern, L and wander floor into those widgets,
@@ -221,7 +221,7 @@ observeEvent(input$trk_load_filter_settings, {
                             function(k) isTRUE(s[[k]]), logical(1)))
   showNotification(
     paste0(if (n_restored) sprintf("Settings loaded (%d analysis settings restored).", n_restored)
-           else "Filter settings loaded (a file from before v0.8: filters and cleaning only).",
+           else "Filter settings loaded (a file from before v0.7.1: filters and cleaning only).",
            if (!is.null(prof) && nzchar(prof))
              sprintf(" Saved with calibration profile '%s'; its values were restored, the profile itself is not reselected.", prof)
            else "",

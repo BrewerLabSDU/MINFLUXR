@@ -228,7 +228,7 @@ trk_settings_key <- function(s) {
 }
 
 # GOAL: the trk_settings block of a parsed settings file, coerced, or NULL when
-# the file has none (written before v0.8). Settings missing from the block are
+# the file has none (written before v0.7.1). Settings missing from the block are
 # left out of the result rather than set to their default, so loading an older
 # block changes only what it recorded. Unknown names are ignored.
 # raw : the list from jsonlite::fromJSON() of the whole file

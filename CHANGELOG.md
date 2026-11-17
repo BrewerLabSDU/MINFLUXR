@@ -3,9 +3,10 @@
 Notable changes to MINFLUXR. Versions follow [semantic versioning](https://semver.org);
 while the app is below 1.0 the panel layout and the settings JSON may still change between releases.
 
-## 0.7.0 - 2026-11-13
+## 0.7.1 - unreleased
 
-First public release (Zenodo).
+Maintenance release: the code was reorganised for testing, and the fixes below came out of
+that work. Results change where an entry says so.
 
 ### SMLM: one filter chain for the plot and the all-files panels
 
@@ -56,6 +57,10 @@ First public release (Zenodo).
 - Golden-output tests pin the numbers of every analysis panel on fixed simulated data, and smoke
   tests render every output. The default test run takes about 3.5 minutes;
   `MINFLUXR_SKIP_APP_TESTS=true` leaves these out.
+
+## 0.7.0 - 2026-11-13
+
+First public release (Zenodo).
 
 ### SMLM: two-color display
 
