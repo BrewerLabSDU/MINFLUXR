@@ -917,3 +917,27 @@ settings spec (older settings files).
 
 Effect: no numeric golden changed; the smoke goldens lost exactly the five
 removed outputs.
+
+## 11. Settings, seeds and the noise-floor line (2026-11-17)
+
+- **Tracking settings spec** (`R/trk_settings.R`): 102 data-affecting inputs with
+  default, type, widget and stage. All widgets in `ui_tracking.R` start at the spec
+  default (tested). The 131 `%||%` fallbacks for these inputs read `TRK_DEFAULTS`;
+  17 had disagreed with the UI (B2), among them the MSD fit window (4 vs 5) and the
+  speed drift window (200 vs 10 ms). They act only on a NULL input, so app results
+  were unaffected.
+- **Tracking settings file**: `settings_version` 2 with a `trk_settings` block;
+  round-trip tested for every setting. The calibration profile is named, not
+  reselected (see the loader).
+- **Seeds**: `trk_seed` and `smlm_seed` in the specs, so they are saved in the
+  settings files. `with_analysis_seed()` wraps 13 Run handlers (listed in the
+  commit) and restores the session's generator afterwards. Fixed internal seeds
+  (MSD clustering, HMM subset, the Median Cluster kNN curve, the stable
+  subsample, density thinning by file name) were left as they were. Golden
+  entries that moved: `msd_boot` (now seeded) and the SMLM settings block (gained
+  the seed); every other random result kept its value.
+- **sigma line** (S3 partly): eight tracking panels record the sigma_loc they used
+  (`sigma_info` attribute) and show it under their summary
+  (`server/tracking/26_sigma_used.R`), amber when uncalibrated, off or unset.
+- **Window check** (Viktor's question on the bounding box): the footprint window
+  reaches both the Ripley data curve and its envelope; `test-smlm-window.R`.

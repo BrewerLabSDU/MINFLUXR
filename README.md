@@ -131,6 +131,25 @@ results are in `tests/validation/`.
 
 ## Documentation
 
+**Which document answers your question**
+
+| If you want to know ... | Read |
+|---|---|
+| what a control does, or how to read a plot or table | [`docs/user_guide.md`](docs/user_guide.md), under the tab and panel |
+| how a number is calculated (formula, corrections, units) | [`docs/MINFLUX_analysis_methods.md`](docs/MINFLUX_analysis_methods.md), Part I |
+| whether a method suits MINFLUX data, and what can bias it | [`docs/MINFLUX_analysis_methods.md`](docs/MINFLUX_analysis_methods.md), Part II (GREEN / AMBER / RED) |
+| where the tracking σ<sub>loc</sub> comes from, and why the prefactor must be calibrated | [`docs/sigma_loc_model.md`](docs/sigma_loc_model.md) |
+| what the SMLM simulator models and how far to trust it | [`docs/simulator.md`](docs/simulator.md) |
+| what the diffusion (tracking) simulator models and how it was validated | [`docs/simulation_module.md`](docs/simulation_module.md) |
+| whether a result can be reproduced | the [Reproducibility](docs/user_guide.md#reproducibility) section of the user guide |
+| what changed between versions | [`CHANGELOG.md`](CHANGELOG.md) |
+| where the code for a panel lives, or how to add one | [`server/README.md`](server/README.md), then the header of the part file |
+| how data flows through the app, and the known open problems | [`docs/architecture_review.md`](docs/architecture_review.md) |
+| what was taken from other software | [`THIRD-PARTY.md`](THIRD-PARTY.md) |
+| how to report a bug or contribute | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
+
+**All documents**
+
 | File | Contents |
 |------|----------|
 | [`docs/user_guide.md`](docs/user_guide.md) | Panel-by-panel reference: every control, every output, and the calculations behind them |

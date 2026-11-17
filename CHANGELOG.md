@@ -26,14 +26,31 @@ First public release (Zenodo).
 
 ### Tracking
 
+- **The settings file now saves every analysis setting.** Besides the filters and cleaning, it holds
+  the acquisition parameters (cycle time, sequence timing, TCP pattern and L, prefactor, beam size,
+  axial factor), the manual σ_loc, the cell geometry and the compute settings of every panel, so a
+  reloaded file reproduces the analysis. Older files still load. A calibration profile is named in the
+  file; its values are restored, the profile is not reselected.
+- **Panels that subtract σ_loc say which value they used.** JDD, D-map, change point, HMM,
+  confinement, displacement, directionality and speed show the σ_loc of their last run and where it
+  came from, and flag an uncalibrated prefactor.
 - **The localization precision is published on the first run.** "Estimate σ_loc" and "Plot MSD" set
   the app-wide σ_loc only from the second press on, so JDD, D-map, change-point, HMM and the
   confinement null ran without noise subtraction after a single press.
 - **The change-point CSV export no longer fails** when a segment has D = 0 after noise subtraction.
   Such a segment gets an empty mixture component.
 
+### Both tabs: reproducible random draws
+
+- **Each tab has a "Random seed for the analyses"**, saved in its settings file. Bootstrap intervals,
+  envelopes, simulated nulls, the hotspot calibration and subsampling start from it on every Run, so
+  the same data and settings give the same numbers in any order. Before, these changed on each Run
+  and could not be reproduced from a settings file. Blank seed = a new draw each Run.
+
 ### Code structure and tests
 
+- Removed code that nothing ran: five outputs with no place in the interface, unused state and six
+  unused helper functions.
 - The three server functions are split into part files under `server/`, one panel or core concern
   each, with the computation in `R/`. See `server/README.md` and `docs/architecture_review.md`.
 - Golden-output tests pin the numbers of every analysis panel on fixed simulated data, and smoke

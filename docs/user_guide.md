@@ -1970,6 +1970,42 @@ demonstrate tracking only to $\approx 2.5$ µm²/s on lipid analogues.
 
 ---
 
+## Reproducibility
+
+A result can be reproduced from the data file and the settings file saved with **Download settings**,
+as long as the points below are kept in mind.
+
+**What the settings files hold.** The SMLM file holds every setting that changes an SMLM result
+(filters, de-blinking, Median Clustering, two-colour split, fiducial exclusion, density
+normalisation, the spatial window options, the crop of the active dataset and the analysis seed).
+The Tracking file holds the range filters, the track cleaning, the acquisition parameters (cycle
+time, sequence timing, TCP pattern and diameter, prefactor, beam size, axial factor), the manual
+σ<sub>loc</sub>, the cell geometry, the compute settings of every analysis panel and the analysis
+seed. Files saved by v0.7.0 and earlier still load; they restore what they recorded.
+
+**Kept in separate files.** Multiplex builds, the two-colour and Median Clustering presets, the
+image overlay, tracking playback settings, calibration profiles and the Compare Cells table each
+have their own save and load buttons.
+
+**Random draws.** Bootstrap intervals, CSR and shift envelopes, simulated free-diffusion nulls, the
+co-localization and crowding nulls, the hotspot calibration and large-data subsampling use random
+numbers. Each Run starts from the tab's **Random seed for the analyses** (SMLM: Analysis tab, under the
+spatial window options; Tracking: Acquisition Parameters, Advanced), so the same data and settings
+give the same numbers on every Run, in any order. The seed is saved in the settings file. A blank seed
+draws a new one each Run. Density thinning is seeded from the file name, so it keeps the same units
+whatever the seed.
+
+**Results that depend on another panel.** In the Tracking tab, JDD, the D-map, change point, the HMM,
+confinement, displacement, directionality and speed use the localization precision σ<sub>loc</sub>
+published by Data Quality & Calibration (or entered by hand). Each of these panels states under its
+summary which σ<sub>loc</sub> it used when it ran and where the value came from. A prefactor marked
+uncalibrated means σ<sub>loc</sub> comes from the ideal estimator; see `docs/sigma_loc_model.md`.
+
+**Not reproduced by a settings file.** The random four-character tag added to each uploaded SMLM file
+(it names the structures, `pcid` / `scid`, in exports) is drawn at upload. A calibration profile is
+named in the tracking settings file, but loading the file restores the values it used rather than
+reselecting the profile, which may have been re-measured since.
+
 ## Plugin System
 
 Additional analysis modules can be added as plugins without modifying the base app:
