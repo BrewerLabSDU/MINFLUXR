@@ -287,8 +287,10 @@ smlm_session_start <- function(session, store, extra_inputs = list()) {
   session$setInputs(active_file = names(store)[1])
   session$flushReact()
   if (is.null(tryCatch(env$uploaded_df(), error = function(e) NULL))) env$uploaded_df_rv(store[[1]])
-  set_inputs(session, c(list(enable_clustering = TRUE, enable_two_color = TRUE,
-                             enable_cluster2 = TRUE, eps2 = 150, minpts2 = 4), extra_inputs))
+  base <- list(enable_clustering = TRUE, enable_two_color = TRUE,
+               enable_cluster2 = TRUE, eps2 = 150, minpts2 = 4)
+  base[names(extra_inputs)] <- extra_inputs              # a caller's value wins
+  set_inputs(session, base)
   session$flushReact()
   session$setInputs(plot_data = 1)
   session$flushReact()
