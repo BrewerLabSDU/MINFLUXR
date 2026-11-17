@@ -90,6 +90,12 @@ output$trk_download_filter_settings <- downloadHandler(
   content = function(file) {
     sf <- trk_spatial_filter()
     s <- list(
+      # ── Every setting that changes a Tracking result (R/trk_settings.R) ─────
+      # The loader restores this block when present. The keys below it stay for
+      # files read by older versions of the app.
+      settings_version = 2L,
+      settings_type    = "minfluxr_tracking",
+      trk_settings     = unclass(isolate(trk_settings_from_input(input))),
       # ── Metadata (per-localization) ranges ──────────────────────────────
       # The stored filters (null = no filter), not the widgets' clamped display.
       efo_rng   = trk_filt$efo %||% NA,   cfr_rng   = trk_filt$cfr %||% NA,
@@ -187,10 +193,38 @@ observeEvent(input$trk_load_filter_settings, {
     fire_frames()
   }
 
+  # ── The settings block (files from v0.8 on): every data-affecting setting ──
+  # Restored last, so where a key appears both here and at the top level the
+  # block wins. The calibration profile is not reselected: selecting it copies
+  # the profile's prefactor, pattern, L and wander floor into those widgets,
+  # which could overwrite the exact values the file holds (the profile may have
+  # been re-measured since). Those values are restored directly instead.
+  blk <- trk_settings_from_file(s)
+  n_restored <- 0L
+  if (!is.null(blk)) {
+    plan <- trk_settings_restore_plan(blk$settings[setdiff(blk$present, "trk_cal_profile")])
+    for (i in seq_len(nrow(plan))) {
+      id <- plan$id[i]; v <- plan$value[[i]]
+      switch(plan$widget[i],
+        numeric  = updateNumericInput(session, id, value = v),
+        checkbox = updateCheckboxInput(session, id, value = isTRUE(v)),
+        select   = updateSelectInput(session, id, selected = as.character(v)),
+        radio    = updateRadioButtons(session, id, selected = as.character(v)),
+        slider   = updateSliderInput(session, id, value = v),
+        text     = updateTextInput(session, id, value = as.character(v)))
+    }
+    n_restored <- nrow(plan)
+  }
+  prof <- if (!is.null(blk)) blk$settings$trk_cal_profile else NULL
+
   cleaning_on <- any(vapply(c("trk_split_gaps_enable","trk_endtrim_enable","trk_quality_enable"),
                             function(k) isTRUE(s[[k]]), logical(1)))
   showNotification(
-    paste0("Filter settings loaded.",
+    paste0(if (n_restored) sprintf("Settings loaded (%d analysis settings restored).", n_restored)
+           else "Filter settings loaded (a file from before v0.8: filters and cleaning only).",
+           if (!is.null(prof) && nzchar(prof))
+             sprintf(" Saved with calibration profile '%s'; its values were restored, the profile itself is not reselected.", prof)
+           else "",
            if (cleaning_on) " Cleaning settings restored - press Plot Data to re-apply them." else "",
            if (!is.null(s$trk_spatial_x)) " Spatial crop restored." else ""),
     type = "message", duration = 6)

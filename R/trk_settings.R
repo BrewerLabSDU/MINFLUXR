@@ -239,7 +239,12 @@ trk_settings_from_file <- function(raw) {
   ids <- intersect(names(blk), names(TRK_SETTINGS_SPEC))
   vals <- lapply(ids, function(id) {
     v <- blk[[id]]
-    if (is.null(v) || (length(v) == 1L && is.na(v) && !TRK_SETTINGS_SPEC[[id]]$na_ok)) return(NULL)
+    na_ok <- TRK_SETTINGS_SPEC[[id]]$na_ok
+    # JSON null comes back as NULL. For a setting where blank is a value (an unset
+    # prefactor, no seed) it means "blank" and must be restored as such: a blank
+    # prefactor in the file has to clear one typed in this session.
+    if (is.null(v) || (length(v) == 1L && is.na(v)))
+      return(if (na_ok) (if (TRK_SETTINGS_SPEC[[id]]$type == "int") NA_integer_ else NA_real_) else NULL)
     .trk_coerce(id, v)
   })
   names(vals) <- ids

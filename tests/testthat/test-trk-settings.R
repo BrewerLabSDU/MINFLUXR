@@ -34,8 +34,10 @@ test_that("settings coerce, reject unknown names and hash stably", {
 test_that("a file block restores only what it recorded", {
   raw <- list(settings_version = 2L, trk_settings = list(trk_uni_min_lag = 8, trk_L_tcp = 151.2,
                                                          trk_crlb_pref = NULL, trk_bogus = 1))
+  # JSON null (NULL here) for a setting where blank is a value restores it as blank
   f <- trk_settings_from_file(raw)
-  expect_setequal(f$present, c("trk_uni_min_lag", "trk_L_tcp"))
+  expect_setequal(f$present, c("trk_uni_min_lag", "trk_L_tcp", "trk_crlb_pref"))
+  expect_true(is.na(f$settings$trk_crlb_pref))
   expect_identical(f$settings$trk_uni_min_lag, 8L)
   expect_null(trk_settings_from_file(list(efo_rng = c(1, 2))))   # an older file: no block
   plan <- trk_settings_restore_plan(trk_settings(trk_uni_iterative = FALSE)[c("trk_uni_min_lag", "trk_uni_iterative")])
