@@ -31,13 +31,13 @@ analysis before applying it to real data.
 
 ## Overview
 
-MINFLUXR provides three main analysis environments:
+MINFLUXR has three tabs:
 
 | Tab | Purpose |
 |-----|---------|
 | **SMLM** | Static super-resolution data: filtering, de-blinking, clustering, co-localization, spatial statistics |
 | **Tracking** | Single-molecule tracking: trajectory visualization, MSD, diffusion analysis |
-| **MINFLUX Simulator** | Generate synthetic MINFLUX datasets - labelled structures, whole acquisitions, and ground-truth diffusion tracks |
+| **MINFLUX Simulator** | Generate synthetic MINFLUX datasets: labelled structures, whole acquisitions, and ground-truth diffusion tracks |
 
 Each tab is split into a **Display** sub-tab (sidebar controls + plot) and an **Analysis** sub-tab
 (per-panel plots and exportable tables).
@@ -98,13 +98,13 @@ Or open `app.R` in RStudio and click **Run App**. The maximum upload size is set
 2. **Load** an Abberior `.npy` or `.json` export (or a `.csv` from pyMINFLUX or from MINFLUXR itself).
    The Display sub-tab shows the localizations; the metadata filters, trace-length and trace-spread
    controls live in its sidebar.
-3. **Press Plot** after changing anything in the clustering or filter blocks: the display and every
+3. **Press Plot** after changing anything in the clustering or filter blocks. The display and every
    analysis read the same filtered data, so they cannot disagree with each other.
 4. **Open the Analysis sub-tab** for the quantitative panels. Each has a collapsed
    *About this method* box giving the origin of the method, what was adapted for MINFLUX and
    what to be aware of before using the result.
-5. **Save your settings** (Download settings, SMLM tab) to reproduce a figure later: every input that
-   changes a number is written to the JSON.
+5. **Save your settings** (Download settings, in either tab) to reproduce a figure later. Every input
+   that changes a number is written to the JSON.
 
 Tracking data: run **Data Quality & Calibration** first. It recovers the cycle time and the
 localization precision that the MSD, JDD, confinement, HMM and D-map panels all read.

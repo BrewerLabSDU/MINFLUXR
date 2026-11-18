@@ -35,9 +35,9 @@ that work. Results change where an entry says so.
 - **Panels that subtract σ_loc say which value they used.** JDD, D-map, change point, HMM,
   confinement, displacement, directionality and speed show the σ_loc of their last run and where it
   came from, and flag an uncalibrated prefactor.
-- **The localization precision is published on the first run.** "Estimate σ_loc" and "Plot MSD" set
-  the app-wide σ_loc only from the second press on, so JDD, D-map, change-point, HMM and the
-  confinement null ran without noise subtraction after a single press.
+- **The localization precision is published on the first run.** "Estimate σ_loc" and "Plot MSD" used
+  to set the app-wide σ_loc only from the second press on, so after a single press JDD, D-map,
+  change-point, HMM and the confinement null ran without noise subtraction.
 - **The change-point CSV export no longer fails** when a segment has D = 0 after noise subtraction.
   Such a segment gets an empty mixture component.
 

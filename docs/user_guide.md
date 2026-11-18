@@ -33,21 +33,21 @@ The importer handles four sources and normalises them to one internal form:
 
 ### About the `.npy` reader
 
-`.npy` is read by a **hand-written pure-R NumPy decoder** (`read_npy()` in `helpers_shared.R`) - there
+`.npy` is read by a hand-written NumPy decoder in pure R (`read_npy()` in `helpers_shared.R`), so there
 is no Python or `reticulate` dependency. It decodes the header, the structured dtype descriptor and
 the raw data block directly.
 
 Two constraints follow from that:
 
-- **Only the newer, flat "tabular" MINFLUX format is supported.** The **legacy nested `m2205` dtype is
-  not read** - the app stops with a clear error asking you to export the tabular format instead.
+- Only the newer, flat "tabular" MINFLUX format is supported. The app does not read the legacy nested
+  `m2205` dtype; it stops with an error asking you to export the tabular format instead.
   Nested structured dtypes have no flat column layout to decode.
 - Fortran-ordered arrays are rejected (re-save C-ordered). A plain unnamed array is rejected too: the
   reader needs the named fields (`loc`/`lnc`, `tid`, `tim`, `efo`, `eco`, `cfr`, `dcr`, `vld`, `fnl`, …).
 
 `.npy` and `.json` converge on the same post-processing: `vld = FALSE` records are dropped, iterations
-are collapsed to one row per localization, and CFR is carried forward. The one difference is how the
-final iteration is chosen - `.npy` uses the `fnl` flag when present, `.json` uses `itr == max(itr)`.
+are collapsed to one row per localization, and CFR is carried forward. They differ only in how the
+final iteration is chosen: `.npy` uses the `fnl` flag when present, `.json` uses `itr == max(itr)`.
 
 Multiple files can be loaded and switched between with the *Active file* selector. `.npy` and `.json`
 are read with **raw z** and get the axial factor applied afterwards; CSVs are first returned to raw so
@@ -58,7 +58,7 @@ default for `.npy`/`.json`, adding an ECO-weighted `dcr_pooled` column.
 
 ## MINFLUX Data Columns Reference
 
-The following columns are read from Abberior exports. Understanding them is useful for interpreting the filter controls.
+The app reads these columns from Abberior exports. The filter controls act on them.
 
 | Column | Full name | Typical units | Description |
 |--------|-----------|---------------|-------------|
@@ -80,7 +80,7 @@ The following columns are read from Abberior exports. Understanding them is usef
 ## SMLM Display Tab
 
 Sidebar groups appear in this order. **Plot Data** (sticky button at the top) applies filters,
-calibration and clustering and re-renders - settings do not live-update the plot.
+calibration and clustering and re-renders. A changed setting reaches the plot only when you press it.
 
 ### Data Upload
 
@@ -91,21 +91,20 @@ to drop one. **Lock filters** preserves current filter values when switching fil
 - **Pool DCR across iterations** (on by default for `.npy` / `.json`) adds an ECO-weighted
   `dcr_pooled` column, a less noisy DCR summary than the final iteration alone.
 - **Display mode** toggles 2D / 3D. In 2D, **Viewing plane** selects XY, XZ or YZ; XZ and YZ are
-  greyed out (not hidden) when the dataset has no axial variation, so it stays visible *why* they are
-  unavailable.
+  greyed out, but still shown, when the dataset has no axial variation.
 
 ### Axial (z) calibration
 
-A per-dataset refractive-index correction applied to z. The default of **0.7 is the pyMINFLUX
-standard**; change it if your refractive index differs. Files are read with raw z and
-the factor is applied once, **on Plot Data** - so a saved analysis reproduces. Loading one of our own
-exports adopts the factor recorded in the file. It multiplies every axial quantity (z spread, cluster
-extent in z, 3D neighbour distances, Rg), so it is a calibration to measure on a known standard, not
-a display preference. Greyed out when the dataset has no axial variation.
+A per-dataset refractive-index correction applied to z. The default of 0.7 is the pyMINFLUX
+standard; change it if your refractive index differs. Files are read with raw z and
+the factor is applied once, on Plot Data, so a saved analysis reproduces. Loading one of our own
+exports adopts the factor recorded in the file. The factor multiplies every axial quantity (z spread,
+cluster extent in z, 3D neighbour distances, Rg), so measure it on a known standard. Greyed out when the dataset has no axial variation.
 
 ### Metadata Filtering
 
-Filters are applied sequentially in the order listed in the sidebar. All filters operate on the currently active dataset.
+Filters are applied in the order below. The main plot shows the active dataset; the same filters
+apply to every other loaded file (see *Filters apply to every loaded file alike* further down).
 
 ```
 Raw data
@@ -117,7 +116,7 @@ Raw data
 
 Stages [1] and [2] remove individual localizations; [3] and [4] remove whole traces. Because the two
 trace-level stages are both evaluated on the same trimmed point set, their relative order does not
-change the result. Trimming, when enabled, runs before both - so a trimmed localization counts
+change the result. Trimming, when enabled, runs before both, so a trimmed localization counts
 neither toward a trace's length nor toward its spread.
 
 **Metadata filters.** Pick a variable, see its histogram (with the unfiltered data behind it in grey
@@ -125,8 +124,8 @@ if *Show raw data* is on), and set a numeric range:
 
 - `EFO` - Effective Frequency at Offset. The averaged emission frequency over all points of the scan
   pattern except the centre; exceedingly high values may indicate multi-emitters.
-- `CFR` - Center Frequency Ratio, EFC/EFO. Commonly used to exclude multi-emitter events; **no CFR
-  cutoff is applied automatically anywhere in the app** - set it yourself if you want one.
+- `CFR` - Center Frequency Ratio, EFC/EFO. Commonly used to exclude multi-emitter events. The app applies no CFR
+  cutoff automatically anywhere; set one yourself if you want it.
 - `TIM` - acquisition timestamp; useful for selecting a time window
 - `DCR` - Detector Channel Ratio; photons at detector 1 vs detector 2, used to separate two labels in
   2-colour MINFLUX
@@ -157,11 +156,11 @@ moving emitters).
 - **Shared axes across σ X / Y / Z** (off by default) - puts the three histograms on one set of bin
   edges and one count axis so they can be read against each other and used as a figure set. When
   enabled, *Shared σ axis range (nm)* sets the displayed span (default 0–30); clearing it falls back
-  to the full data range. This is a display range only and filters nothing - values outside it are
+  to the full data range. It sets the display range only and filters nothing; values outside it are
   left out of the plot, and a note reports how many.
 - *Set spread ranges to the 95th percentile* seeds the σ filter ranges from the data.
 - **TID spread filter**: per-axis x/y/z bounds. Setting the upper bound low retains only spatially
-  tight traces - useful for removing gold beads or freely diffusing molecules. An empty box means no
+  tight traces, which is useful for removing gold beads or freely diffusing molecules. An empty box means no
   bound on that side (blank lower reads as 0, blank upper as no upper limit), so clearing both leaves
   that axis unfiltered. See [Trace Spread](#trace-spread-sd-filter).
 
@@ -201,11 +200,11 @@ restores the settings it holds and leaves the others as they are.
 
 ### De-blink correction
 
-Combats the instrument artifact where one fluorophore that blinks several times produces several trace
-IDs stacked on top of each other, overcounting the number of molecules. De-blinking merges them back
+A fluorophore that blinks several times produces several trace IDs stacked on top of each other, so
+the molecule count comes out too high. De-blinking merges them back
 into one **de-blinked ID** with a shared centroid, so downstream analyses count molecules.
 
-Works at **trace level** - a whole trace joins a molecule or it does not, so a trace is never split.
+It works on whole traces: a trace joins a molecule or it does not, and is never split.
 
 #### The two criteria
 
@@ -221,7 +220,7 @@ rewrites the distance.
 - *Disadvantages* - it needs a distance, so it depends on the measured trace spread being
   representative of the whole file. Heterogeneous data (mixed labels, widely varying photon counts)
   is served less well by one global number. The result is sensitive to the value chosen: too low
-  leaves re-blinks counted separately, too high fuses genuinely distinct neighbours.
+  leaves re-blinks counted separately, too high fuses distinct neighbours.
 
 **Majority vote of localizations** - merge when a fraction *f* of a trace's localizations sit closer
 to a neighbouring trace's centroid than to their own. Each localization is compared against its own
@@ -241,24 +240,24 @@ enough.
   than "merged within X nm". Because it is relative, there is no single nanometre figure to quote or
   to compare against another dataset.
 
-**De-blinking only merges - it never deletes.** A trace that cannot be merged becomes its own
-single-blink molecule, so every trace that survived filtering is still counted. Removing data is the
-job of the metadata filters, the optional outlier trimming and the spread filters, where it is
-visible and reversible.
+De-blinking only merges traces; it never deletes them. A trace that cannot be merged becomes its own
+single-blink molecule, so every trace that survived filtering is still counted. Data is removed only by
+the metadata filters, the optional outlier trimming and the spread filters, where you can see and undo
+it.
 
 #### Choosing the threshold
 
 *Measure threshold from data* sets it from your own file: it measures the per-axis trace spread and
 returns **k × that spread**, with *k* defaulting to 2.8. Grouping accuracy is flat between about
 k = 2.6 and 3.1, and because a molecule can never be wider than the threshold, overshooting costs less
-than undershooting - so the default sits inside that plateau.
+than undershooting. The default sits inside that plateau.
 
-The threshold is the trace spread times *k*, and nothing else. Sample drift is measured, but it is
-reported in the [Localization Precision Cloud](#panels) QC panel and deliberately kept out of this
-number: the only molecules whose motion can be observed are the ones that were already merged - that
-is, the ones that moved *less* than the very radius being set - so feeding it back would be circular.
+The threshold is the trace spread times *k*, with no drift term. Sample drift is measured and
+reported in the [Localization Precision Cloud](#panels) QC panel, but kept out of this number. The only
+molecules whose motion can be observed are those already merged, which moved *less* than the radius
+being set, so feeding their motion back into it would be circular.
 
-Two diagnostics sit beside it - a density plot whose orange curve should show two humps (re-blinks
+Two diagnostics sit beside it: a density plot whose orange curve should show two humps (re-blinks
 left, separate molecules right) with your threshold in the gap, and an exploratory
 molecule-count-vs-threshold curve. If the density plot shows no clear gap, no threshold will cleanly
 separate re-blinks from neighbours in that dataset, and the molecule count should be treated as
@@ -277,7 +276,7 @@ TID medians) become the representative points for downstream analysis including 
 
 ### Nearest Neighbor Analysis
 
-Nearest-neighbour distances computed from median positions - de-blinked molecule medians when
+Nearest-neighbour distances computed from median positions: de-blinked molecule medians when
 de-blink correction is on, trace medians otherwise. Controls: *k*, optional distance labels (font
 size and offset), a distance-range filter, and a downloadable table. NN lines are drawn on the plot.
 
@@ -286,8 +285,8 @@ Median Clustering is active a **Within Median Cluster only** option restricts th
 
 ### Median Clustering
 
-The app's one real clustering step. It runs on **representative points** - one point per trace median,
-or per de-blinked molecule median when de-blinking is on - and groups them into larger spatial
+The app's one real clustering step. It runs on **representative points** (one point per trace median,
+or per de-blinked molecule median when de-blinking is on) and groups them into larger spatial
 structures, for example a collection of receptors arranged in a ring, or a row of nuclear pores along
 the nuclear envelope.
 
@@ -326,7 +325,7 @@ Settings can be saved and reset with the buttons at the bottom of the group.
 
 In **2D**: *Wrap Median Cluster in Convex Hull*.
 
-In **3D**: *Wrap Cluster in Alpha Shape* (concave hull via `alphashape3d`), or *Show isosurface* - a
+In **3D**: *Wrap Cluster in Alpha Shape* (concave hull via `alphashape3d`), or *Show isosurface*, a
 surface render of the cluster, drawn as a contour of a Gaussian kernel density summed over the same
 representative points the clustering used (de-blinked molecule medians when de-blinking is on, else
 trace medians).
@@ -397,8 +396,8 @@ R_\text{bend} = \frac{\ell^2 + s^2}{2s}
 ```
 
 where $\ell$ is the PC1 half-extent (chord half-length) and $s$ is the PC2 extent (sagitta).
-**Only valid for arc-like clusters viewed roughly edge-on** - not meaningful for complete rings,
-spheres, or helices.
+It is only valid for arc-like clusters viewed roughly edge-on, and means nothing for complete rings,
+spheres or helices.
 
 #### NN distances within Median Clusters
 
@@ -431,7 +430,7 @@ Two **auto-alignment** modes are available once an image and pixel size are prov
 
 *Show detection diagnostics* plots what the detector found, and a collapsible **Foci detection
 settings** block exposes the sensitivity, edge mask, minimum separation, and the MINFLUX-side density
-threshold / cell size / smoothing radius. Results are a starting point - nudge the origin to refine.
+threshold / cell size / smoothing radius. Treat the result as a starting point and nudge the origin to refine it.
 
 ### Heatmap overlay
 
@@ -454,8 +453,8 @@ distribution and solves for the crossing point of the two weighted densities. Se
 
 **Per-trace split confidence** (collapsible) plots the posterior probability that each trace belongs
 to the group it was assigned to. 1.0 = unambiguous; 0.5 = the molecule sits exactly on the split.
-Traces below the cut are marked orange - these are the ones that would change channel under a small
-threshold shift, and the ones that manufacture false short-range cross-channel pairs. Exportable so
+Traces below the cut are marked orange. They would change channel under a small threshold shift, and
+they are the ones that produce false short-range cross-channel pairs. Exportable so
 you can exclude or inspect them.
 
 Each group gets its own colour. Additional options:
@@ -464,8 +463,8 @@ Each group gets its own colour. Additional options:
   distance range, optional labels, and a CSV export.
 - **2-color de-blink correction** - the same centroid/vote criteria as the mono-colour de-blinker,
   with its own threshold, *Measure threshold from data* button and gap diagnostic. De-blinked IDs
-  carry their channel (`A-1`, `A-2` … / `B-1`, `B-2` …), and **only members of the same channel can
-  merge**, so two colours can never be de-blinked into one molecule. In 3D the de-blinked molecules
+  carry their channel (`A-1`, `A-2` … / `B-1`, `B-2` …), and only members of the same channel can
+  merge, so two colours can never be de-blinked into one molecule. In 3D the de-blinked molecules
   can be wrapped in alpha shapes.
 - **2-color Median Clustering** - Median Clustering run per channel, with the same DBSCAN / HDBSCAN /
   OPTICS choice and the same cleanup steps (prefilter, core points only, prune, min members), plus
@@ -485,17 +484,16 @@ Builds an **N-channel** dataset for exchange / sequential MINFLUX. Two channel s
 - **Overlay loaded files** - pick several loaded files; each becomes one channel with its own colour.
 - **Split active file by time (TIM)** - split one continuous acquisition. Either *contiguous
   breakpoints* (N breakpoints → N+1 channels, up to 7) or *explicit windows* (`start-end, start-end,
-  …`), where localizations falling **outside** all windows - the wash / exchange steps - are removed.
+  …`), where localizations outside all windows (the wash / exchange steps) are removed.
   A trace-IDs-over-time histogram shows the split live: bar colour = channel, grey = removed, dashed
   lines = window edges.
 
-Clustering runs strictly **per channel** - molecules imaged in different exchange rounds must never
-merge. Channels feed both the plot and the Analysis tab.
+Clustering runs per channel, so molecules imaged in different exchange rounds never merge. Channels feed both the plot and the Analysis tab.
 
 ### Estimate Ground-Truth Positions
 
-> **Exploratory.** This inverts an assumed labelling model - read it as a hypothesis about the
-> labelling.
+> **Exploratory.** This inverts an assumed labelling model. Read the result as a hypothesis about
+> the labelling.
 
 Reverses the labelling model to propose where the underlying epitopes were. You choose a **labelling
 preset** (the same presets as the Simulator: linker length, valency, dye spread, footprint, extra
@@ -509,7 +507,7 @@ blinks) or supply custom values, plus a labelling/detection efficiency.
   multivalent label scatters many fluorophores around one molecule. Blank = auto per preset (max of
   footprint and 2.5 × dye spread); 0 = no merge.
 - **Stoichiometry-guided merge** *(model-driven)* - where the spatial merge leaves more GTs than the
-  labelling stoichiometry predicts, collapse further toward that target. Only ever reduces the count;
+  labelling stoichiometry predicts, collapse further toward that target. It only reduces the count and
   never splits. Sanity-check it against the two-count readout.
 - **Displace GT inward** - the antibody binds a surface epitope and the linker throws the dye
   *outward*, so the trace cloud sits ~one linker-length outside the true structure. This pushes each
@@ -567,7 +565,7 @@ interpretation is not settled; their method box in the app says what to be aware
 group**. In group mode you define up to 6 groups (name, colour, member files) and the distribution
 analyses relabel and pool by group so you can compare conditions. Files left unassigned are ignored.
 Spatial statistics (Ripley / PCF) average per-file curves within a group instead of pooling
-coordinates - pooling would mix observation windows and invent structure.
+coordinates, because pooling would mix observation windows and invent structure.
 
 **The cell (file) is the unit of replication.** A group-mode histogram pools distances or clusters from
 every file, and units from one cell are correlated, so a statistical test on those pooled units overstates
@@ -578,7 +576,7 @@ with the file's group. Run between-group statistics on those rows.
 ### De-blinking applies to every dataset
 
 De-blinking is a **global** switch (Display tab), and every batch analysis re-derives it per file, so
-enabling it once applies it to all loaded datasets - there is nothing to set per file.
+enabling it once applies it to all loaded datasets. There is nothing to set per file.
 
 The panels with a **Unit** selector (Batch NN, Ripley's L, g(r)) default to **Auto**, which resolves to
 de-blinked molecules when de-blinking is on and trace IDs when it is off, so every panel follows the
@@ -587,25 +585,25 @@ IDs with a warning rather
 than returning nothing.
 
 Note the **Crowding** panel needs unclustered background traces to reference its timing shift against.
-If every molecule ends up inside a median cluster it will report nothing - that is the background rule,
-not a de-blinking problem.
+If every molecule ends up inside a median cluster it reports nothing. That comes from the background
+rule; de-blinking is not the cause.
 
 ### Observation window and edge correction
 
 Two checkboxes at the top of the tab, inside the collapsed labelling-density section. They apply to
-Ripley's L, g(r), L12, g12 and the co-localization null, and they fix **different** things - usually only
+Ripley's L, g(r), L12, g12 and the co-localization null, and they fix different things. Usually only
 the first is wanted.
 
 **Edge correction.** A point near the edge of the window has fewer neighbours available to it than one in
-the middle, simply because part of its surroundings falls outside the window. Left uncorrected, that
-deficit grows with r, so every curve drifts downward at larger radii and a genuinely random pattern stops
-reading as random. The correction accounts for how much of each neighbourhood actually fell inside the
+the middle, because part of its surroundings falls outside the window. Left uncorrected, that
+deficit grows with r, so every curve drifts downward at larger radii and a random pattern stops
+reading as random. The correction accounts for how much of each neighbourhood fell inside the
 window (the translation correction; Illian et al. 2008; Baddeley et al. 2015). It is on by default.
 
 **Footprint window.** Changes what counts as the observed area. If your cell fills the scan field, the
-bounding box already *is* the cell and you should leave this off. Turn it on when the cell is concave or
-only partly in frame - then the box contains a large empty region, the density is under-stated, and the
-pattern reads as clustered purely because of how it was framed.
+bounding box already is the cell and you should leave this off. Turn it on when the cell is concave or
+only partly in frame. The box then contains a large empty region, the density is under-stated, and the
+pattern reads as clustered only because of how it was framed.
 
 Two things to know:
 
@@ -634,85 +632,88 @@ in the Labelling Density panel shows which region is in use.
 A curve that heads **straight down into the negative in a near-straight line** is a window artefact.
 K scales with the window area, so if the area being divided by is much too small the whole curve is
 pulled down proportionally, which looks like a line. The usual cause is a window drawn around the
-structures instead of around the cell - see the decision rule above.
+structures instead of around the cell (see the decision rule above).
 
-L(r)-r **does not return to zero** once clustering stops, and this is expected. K counts every pair closer than r, so an excess at short range stays
+L(r)-r does not return to zero once clustering stops, and this is expected. K counts every pair closer than r, so an excess at short range stays
 counted at every larger radius; the curve decays only slowly from there. That is also why the position of
-the L(r)-r peak is *not* the cluster size - read the size from g(r) instead, at the radius where it comes
+the L(r)-r peak is not the cluster size. Read the size from g(r) instead, at the radius where it comes
 back down to 1.
 
 ### How filtering works on this tab
 
-Every analysis on the Analysis tab applies the **Display-tab filter ranges** - EFO, CFR, DCR, ECO,
-dwell, fluo, trace-ID length, trace spread and outlier trimming - identically to *all* loaded files.
+Every analysis on the Analysis tab applies the Display-tab filters to *all* loaded files, in the same
+order as the main plot: metadata ranges (EFO, CFR, DCR, ECO, dwell, fluo), outlier trimming, trace-ID
+length and trace spread.
 
-The one thing to watch: the sliders' *limits* are auto-detected from the **active file**, so if another
-dataset runs higher on a metric, check that a range which looks like "no filter" still means that
-before comparing groups. The time (`tim`) range is per-file by nature, since each acquisition has its
-own timeline. This is stated as a note at the top of the tab.
+The slider limits are detected from the **active file**. A metadata range left at those limits counts
+as unset and filters no file. Once you narrow it, its two values apply to every file, so if another
+dataset runs higher on that metric, check what the range cuts there before comparing groups. The time
+(`tim`) range is per-file by nature, since each acquisition has its own timeline. This is stated as a
+note at the top of the tab.
 
 ### Labelling density normalisation (opt-in) ⚠
 
-Collapsed by default, and off by default - most experiments do not need it.
+Collapsed and off by default; most experiments do not need it.
 
 It exists for the case where labelling density varies between acquisitions for reasons that are not
 biology: transient transfection giving each cell an undefined plasmid load, differing expression level,
-run-to-run labelling efficiency. That variation is not cosmetic, and it pushes in the direction that
+run-to-run labelling efficiency. That variation pushes in the direction that
 *mimics* aggregation. Nearest-neighbour distances shrink as density rises, and DBSCAN at a fixed eps and
 minPts is itself a density threshold, so a high expresser reads as more clustered even when nothing about
 its organisation has changed.
 
 **Measure** reports, per file, how many units there are and the density over an estimated sample area:
 
-- **Unit** is a de-blinked molecule when de-blinking is on, and a trace ID otherwise. This matters: a
+- **Unit** is a de-blinked molecule when de-blinking is on, and a trace ID otherwise. A
   trace ID is a single blink, so trace-ID density mixes expression level together with photophysics and
   laser power, and is not comparable between runs.
 - **Area** is the region the sample occupies. A MINFLUX field routinely
   contains the edge of a cell and interior dark regions, and a bounding box counts all of that as sample,
-  so a cell imaged half in frame reads at half its true density purely from framing. Four estimators are
+  so a cell imaged half in frame reads at half its true density from framing alone. Four estimators are
   offered; the default smooths the localizations into a density map and keeps the smallest region holding
   a given share of the units (Hyndman 1996). Dark regions fall below the cut on their own and there is no
   fill radius to tune. The alternatives are an occupancy grid with a morphological fill, the convex hull,
   and the bounding box.
 - **Density (NN)** is a second estimate from nearest-neighbour distances that needs no area at all, so it
-  is a useful check on the area-based number. It is deliberately not used as the thinning target, because
+  is a useful check on the area-based number. It is not used as the thinning target, because
   it measures density locally and clustering inflates it.
 
 The plot shows one **horizontal violin per dataset** over the per-unit local density, with the overall
 density marked as a diamond. The single number tells you how much label there is; the shape tells you how
-it is arranged. A cell with real aggregates is heterogeneous - a sparse background plus a dense tail -
+it is arranged. A cell with real aggregates is heterogeneous (a sparse background plus a dense tail),
 where a uniformly labelled cell at the same average is narrow. Keep the smoothing settings identical
 across the samples you compare: together they define what "the sample area" means.
 
 **Show support map** draws one dataset with the counted area outlined in green and the disregarded part
-shaded red, over the localizations. This is what makes the area estimate checkable - the number says
-"30% of the frame", but only the picture says whether that 30% is the *cell* or a tracing of your own
-*structures*. Two honest limits: the frame is the bounding box of the data, because a localization table
+shaded red, over the localizations. Use it to check the area estimate: the number says
+"30% of the frame", but only the picture shows whether that 30% is the *cell* or a tracing of your own
+*structures*. Two limits apply. The frame is the bounding box of the data, because a localization table
 carries no record of the real scan field, so red only ever marks interior dark regions and concave
-margins; and in 3-D the map is a plan view, so the area looks larger in projection than it is.
+margins. In 3-D the map is a plan view, so the area looks larger in projection than it is.
 
 **Thin all files to a common density** is the second, separate opt-in. Keeping each unit with a fixed
 probability leaves the pair correlation g(r) and Ripley's K unchanged, so real clustering survives
 thinning while a difference caused only by labelling density does not. Thinning every file to one density
-therefore makes even the fixed-threshold DBSCAN read-outs comparable. It drops whole units - a trace or a
-molecule with all its localizations - after the metadata filters and before clustering. Quality-Control
+therefore makes even the fixed-threshold DBSCAN read-outs comparable. It drops whole units (a trace or a
+molecule with all its localizations) after the metadata filters and before clustering. Quality-Control
 panels are exempt: they must see the data as acquired.
 
-**Scope: what thinning is and is not for.** It matters only for **count-based** read-outs - DBSCAN cluster
-counts, % in clusters, cluster sizes, nearest-neighbour distributions - which change with labelling
+**What thinning is for.** It matters only for count-based read-outs (DBSCAN cluster
+counts, % in clusters, cluster sizes, nearest-neighbour distributions), which change with labelling
 density by construction, and are not comparable between files of differing density unless you match first.
 **Ripley's L and g(r) do not need it at all**, because they already divide the density out; thinning those
-discards data without changing the answer. The useful summary: **for K, L and g the observation window is
-everything and the labelling density is nothing** - they divide density out but multiply by the area,
-which is why the area estimate and the edge correction matter so much and this section usually does not.
+discards data without changing the answer. For K, L and g the observation window is
+everything and the labelling density is nothing, because they divide density out but multiply by the
+area. That is why the area estimate and the edge correction matter so much and this section usually
+does not.
 
 With thinning off, the density measurement is still worth having: it tells you how comparable your
 acquisitions are, whether you have enough molecules for a stable g(r) estimate, and whether density
 happens to confound with condition.
 
-Two limits the panel will not exceed. It **never up-samples**, so a file already below the target is left
+The panel has two limits. It never up-samples, so a file already below the target is left
 untouched; the default target is the lowest density in the set for exactly that reason. And thinning
-**cannot separate density from biology when the two are genuinely linked** - for a self-aggregating
+cannot separate density from biology when the two are linked. For a self-aggregating
 protein they are, since aggregation depends on concentration. A difference that survives at matched
 density is evidence; a difference in how clustering *scales* with density is stronger evidence, and needs
 a spread of expression levels per condition rather than one matched pair.
@@ -765,8 +766,8 @@ g_{12}(r) = \frac{A}{n_1 n_2} \cdot \frac{\#\text{cross-pairs in annulus}\bigl(r
 
 with the 3D form using a spherical shell and $\tfrac{4}{3}\pi[(r+\tfrac{\delta}{2})^3 - (r-\tfrac{\delta}{2})^3]$.
 Under CSR with independent groups, $g_{12}(r) = 1$; > 1 indicates co-localization at scale *r*, < 1
-exclusion. $L_{12}(r)$ accumulates all pairs up to *r* and can mask scale-specific effects - the PCF
-pinpoints them.
+exclusion. $L_{12}(r)$ accumulates all pairs up to *r* and can mask scale-specific effects, which the
+PCF resolves.
 
 #### 2D KDE Density Map & Co-localization
 
@@ -817,8 +818,8 @@ Merging pools tracks from different cells, which suits exploring them together b
 population. To compare conditions with the cell as the replicate, use *Compare Cells* (Analysis tab),
 which analyses every loaded file on its own whichever dataset is active.
 
-Large files are **chunked** on upload - split into blocks of whole TIDs written to a manifest
-directory - so rendering stays responsive on modest hardware. Chunk size is set by *TIDs per chunk*.
+Large files are **chunked** on upload (split into blocks of whole TIDs written to a manifest
+directory), so rendering stays responsive on modest hardware. Chunk size is set by *TIDs per chunk*.
 The selected chunk scopes the **playback animation**; tick *Limit Full tracks to the selected chunk*
 to scope the static view as well (off by default, where Full tracks draws every track). The filter
 pipeline and every analysis always read **all** TIDs, so nothing is ever restricted to the chunk you
@@ -882,8 +883,8 @@ Two things to know about how filters apply:
 
 - **Filters do not live-update the plot.** They apply on **Plot Data**. The histogram and the
   read-outs update live so you can see what you are selecting; the rendered tracks stay put until you
-  ask. This is deliberate - re-rendering a WebGL track view on every slider move is slow and makes the
-  filters feel laggy.
+  ask. Re-rendering a WebGL track view on every slider move is slow and makes the filters feel
+  laggy.
 - **Plot Data is the single apply action.** It runs the cleaning stages, applies the filters,
   re-chunks the surviving tracks at the current *TIDs per chunk*, and re-renders. There is no separate
   rechunk step. *Reset ranges* restores the original uploaded manifest.
@@ -932,8 +933,8 @@ downstream.
 Sets the **motion degrees of freedom**: volume (3), surface (2), or filament (1). This is not
 cosmetic. A per-axis estimator spreads 2-DOF motion over 3 recorded axes, so a membrane protein
 tracked in 3D reports D at 2/3 of its true value unless the geometry says otherwise. It also sets the
-χ² degrees of freedom for the confinement band. **Defaults to volume** - set it to surface for
-membrane work or every D and confinement call below inherits the bias.
+χ² degrees of freedom for the confinement band. It defaults to volume. Set it to surface for
+membrane work, or every D and confinement call below inherits the bias.
 
 ### MSD (diffusion)
 
@@ -947,7 +948,7 @@ diagnostic** shows how steps distribute across cycle counts.
 ### Confinement (MSD index)
 
 Confinement ratio from the MSD curve's departure from linearity, with a simulated null for
-comparison. Confined percentages are **not comparable across different track lengths** - a longer
+comparison. Confined percentages are **not comparable across different track lengths**, because a longer
 track has more chance to reveal a plateau.
 
 ### Track Segmentation - Change-Point + GMM
@@ -957,8 +958,8 @@ diffusive behaviour into a Gaussian mixture. Use when a single D per track is cl
 
 ### Jump Distance Distribution (JDD)
 
-Fits the distribution of single-step displacements as an N-component mixture - **Rayleigh in 2D,
-Maxwell in 3D** - with σ_loc bias correction and an integrated-steps-only mode. Complementary to MSD:
+Fits the distribution of single-step displacements as an N-component mixture (**Rayleigh in 2D,
+Maxwell in 3D**) with σ_loc bias correction and an integrated-steps-only mode. Complementary to MSD:
 it uses the full displacement distribution rather than its second moment, so it separates populations
 that share a mean. Steps must be pooled at a fixed real Δt; mixing cycle counts pollutes the fit.
 
@@ -971,7 +972,7 @@ far below, for confinement. Uses the motion-DOF-corrected D and the χ² degrees
 
 ### Directionality / Autocorrelation
 
-Velocity autocorrelation and turning-angle statistics - persistent directional motion shows positive
+Velocity autocorrelation and turning-angle statistics. Persistent directional motion shows positive
 correlation at short lags where free diffusion shows none.
 
 ### Diffusion State Segmentation (HMM) and Per-Segment MSD
@@ -984,7 +985,7 @@ of one average that describes neither.
 ### Speed & Transport
 
 Drift velocity and a noise-corrected local α(t). Path speed alone cannot distinguish directed
-transport from fast diffusion - a random walk sampled finely has a high path speed - so the drift
+transport from fast diffusion (a random walk sampled finely has a high path speed), so the drift
 term and the local anomalous exponent are the informative quantities here. An **Advanced** block
 exposes candidate directed segments with per-event corroboration.
 
@@ -1026,8 +1027,8 @@ selected track. The first place to look when an aggregate result seems wrong.
 
 ### Where the explanations live
 
-Panels on this tab print **numbers and short verdicts only**. Every method's rationale - what it
-assumes, how it is adapted to MINFLUX, and where it fails - is in the collapsed
+Panels on this tab print **numbers and short verdicts only**. Every method's rationale (what it
+assumes, how it is adapted to MINFLUX, and where it fails) is in the collapsed
 **ℹ About this method** box at the head of each panel, with the maths in *Key Calculations*
 below. Warnings still appear inline, but as one line each, so a result that
 needs attention is visible instead of buried.
@@ -1073,7 +1074,7 @@ Two consequences worth knowing before choosing one: a polyclonal + secondary IgG
 **~32 trace IDs per protein**, and the shared linker sets a resolution **floor** that no amount of
 acquisition time removes (~50 nm for that sandwich, ~6 nm for a nanobody). The full generative model -
 dye counts, the three displacement levels, TID multiplication, and a table of every preset's
-TIDs/molecule, detection probability and resolution floor - is derived in
+TIDs/molecule, detection probability and resolution floor) is derived in
 [docs/simulator.md §1.2](docs/simulator.md).
 
 **Localization precision** - either a manual σ (separate XY and Z) or a **CRLB from photon budget**:
@@ -1103,8 +1104,8 @@ to analyse them through the normal pipeline.
 > **Exploratory validation tool.** Its purpose is to check that the Tracking tab's estimators recover
 > a *known* D.
 
-Free Brownian motion on a cell shape, sampled the MINFLUX way - cycle clock, dark cycles,
-heteroscedastic σ_loc and photobleaching - producing MINFLUX-format tracks with a ground-truth D.
+Free Brownian motion on a cell shape, sampled the MINFLUX way (cycle clock, dark cycles,
+heteroscedastic σ_loc and photobleaching), producing MINFLUX-format tracks with a ground-truth D.
 Download the tracks and load them in the Tracking tab to check CVE / MSD / confinement.
 
 - **Cell geometry**: sphere, rod / spherocylinder (with a choice of long axis), ellipsoid, membrane plane (a tilted flat sheet in 3D, no curvature → no
@@ -1139,8 +1140,8 @@ the factor you set (SMLM sidebar *Axial (z) calibration*, Tracking sidebar *Axia
 both defaulting to 0.7) is applied once afterwards, on Plot Data. CSVs are first returned to raw z -
 the app detects what factor they already carry, exactly when the file was exported from here (a
 `z_scale_applied` column) and by assumption otherwise. Exports write that column so a round-trip is
-exact. Because the factor multiplies every axial quantity - z spread, cluster extent, 3D neighbour
-distances, Rg - applying it twice would compress z by 30%, which the detection prevents.
+exact. Because the factor multiplies every axial quantity (z spread, cluster extent, 3D neighbour
+distances, Rg), applying it twice would compress z by 30%, which the detection prevents.
 
 Scaling is applied after unit conversion, to correct for the refractive-index mismatch between the
 sample medium and the objective immersion medium:
@@ -1150,7 +1151,7 @@ z_\text{corrected} = z_\text{nm} \times s_z \quad (s_z = 0.7 \text{ by default})
 ```
 
 **Multi-iteration MINFLUX**: each TID produces localizations at several iteration steps (`itr`). By
-default only the final iteration is retained - chosen by the `fnl` flag for `.npy`, by
+default only the final iteration is retained, chosen by the `fnl` flag for `.npy`, by
 `itr == max(itr)` for `.json`. The CFR value used is the last non-zero CFR recorded across all
 iterations for that TID (*last_nonzero* carry-forward), because CFR is often only populated in early
 iterations.
@@ -1192,8 +1193,8 @@ statistic entirely. When outlier trimming is enabled, $\sigma$ is computed on th
 localizations.
 
 The **spread panel** histogram shows the distribution of per-TID spreads and overlays the current
-filter range. The median spread is reported as median(σ̃) ± nMAD, with nMAD = 1.4826 × MAD - the
-1.4826 makes nMAD a consistent estimator of σ for normal data - and the quartiles are drawn as dotted
+filter range. The median spread is reported as median(σ̃) ± nMAD, with nMAD = 1.4826 × MAD (the
+factor makes nMAD a consistent estimator of σ for normal data), and the quartiles are drawn as dotted
 lines beside it. This matches pyMINFLUX convention summarizing the same distribution, which labels
 its median line with median ± MAD and marks the interquartile range alongside it.
 
@@ -1206,8 +1207,8 @@ separately, because axial and lateral precision differ.
 ### Outlier Localization Trimming
 
 Optional, off by default. Flags individual localizations that do not fit their own trace, so a trace
-is not discarded whole because of a few stray points. It removes points only - deciding the fate of a
-whole trace stays with the spread filter.
+is not discarded whole because of a few stray points. It removes points only; whether a
+whole trace stays is left to the spread filter.
 
 For trace $t$ with $n_t$ localizations, the per-axis centre is the median and the distance is
 whitened per axis, so the anisotropy of MINFLUX precision does not leak into one threshold:
@@ -1227,26 +1228,26 @@ estimate toward the dataset-wide one:
 
 Short traces borrow the dataset's stability; long traces trust their own estimate. Both levels use a
 robust estimator because an SD-based scale would be inflated by the very outliers the test is meant
-to find. This is internal machinery - the reported σ̃ remains the plain SD above.
+to find. The reported σ̃ remains the plain SD above.
 
 Asking whether a point is unlike *its own trace*, rather than unlike the dataset, is what makes a
 uniformly broad trace (drift, a fiducial, two merged molecules) lose nothing here: all of its points
 agree with each other, and judging it is the trace-level filters' job.
 
-**Guards.** Traces shorter than 6 localizations are never trimmed - at that length a single point is
+**Guards.** Traces shorter than 6 localizations are never trimmed. At that length a single point is
 a large share of the evidence and the median defining "far" is itself poorly determined. Trimming
 also never reduces a trace below the *Min localizations per trace* setting.
 
 **Choosing $k$.** Gaussian theory is not a useful guide here: real MINFLUX within-trace residuals are
 heavier-tailed than Gaussian, so a $k$ that rejects almost nothing in theory rejects a few percent in
 practice. The info box therefore reports the rejection rate **measured on the loaded data** rather
-than a theoretical figure. Note that trimming lowers the reported σ̃ partly by genuinely removing
+than a theoretical figure. Note that trimming lowers the reported σ̃ partly by removing
 outliers and partly by selection, since the retained points are those closest to the median; a
 conservative $k$ keeps the selection component small.
 
 **Interaction with the length filter.** Trimming shortens traces, so a trace can drop below the TID
 length minimum and be removed by that filter even though it passed before. This is the correct
-reading - a trace with four valid localizations is a four-point trace - and it is reported rather
+reading (a trace with four valid localizations is a four-point trace), and it is reported rather
 than prevented, because tying the trim guard to the length minimum would retain known-bad
 localizations purely to satisfy a count, corrupting the median position and spread that the length
 filter exists to protect.
@@ -1307,7 +1308,7 @@ either the IQR or the MAD as a spread indicator.
 
 > The first-NN distance distribution reveals the typical inter-molecule or inter-structure spacing. A
 > narrow peak indicates a regular, lattice-like arrangement; a broad tail suggests heterogeneity.
-> **A sharp peak below ~40 nm is usually the label footprint* - the distance-range
+> **A sharp peak below ~40 nm is usually the label footprint.** The distance-range
 > filter trims the histogram but does not correct that bias. NN carries no CSR reference; use
 > Ripley's L(r) with its envelope if you need significance.
 
@@ -1368,7 +1369,7 @@ R_g = \sqrt{\frac{1}{m}\sum_{k=1}^{m}\left[(\tilde{x}_k - \bar{x})^2 + (\tilde{y
 
 Only clusters with $m \geq 2$ are included (a single point has $R_g = 0$ by definition). The
 exportable table reports cluster ID, point count, centroid coordinates and $R_g$. RoG is
-small-*N*-biased - it is reported with its anisotropy and should not be used as a classifier on its
+biased at small *N*. It is reported with its anisotropy and should not be used as a classifier on its
 own.
 
 ---
@@ -1396,7 +1397,7 @@ where SW is a constant per-step overhead. Inverting it classifies each step:
 n_\text{cyc} = \mathrm{round}\!\left(\frac{\Delta t - \text{SW}}{t_c}\right), \qquad n_\text{dark} = n_\text{cyc} - 1
 ```
 
-Steps with $n_\text{cyc} = 1$ are **integrated** (single-cycle) steps - the constant-Δt subset that CVE,
+Steps with $n_\text{cyc} = 1$ are **integrated** (single-cycle) steps: the constant-Δt subset that CVE,
 JDD and the directionality tools restrict themselves to.
 
 #### Estimating $t_c$
@@ -1408,7 +1409,7 @@ $\text{SW} = \text{centre}_1 - t_c$; (4) a regression from the Δt-vs-index slop
 
 Method (3) uses the **spacing between clusters**, because:
 
-> ⚠ **The modal Δt is not the cycle time** - it is $1 \cdot t_c + \text{SW}$. Mistaking one for the
+> ⚠ **The modal Δt is not the cycle time.** It is $1 \cdot t_c + \text{SW}$. Mistaking one for the
 > other biases every D by about **−5.5%**.
 
 #### What the interval structure looks like
@@ -1426,8 +1427,8 @@ spread of a few hundredths of a percent. Two properties of the panel follow from
   optional cycle-multiple markers. There is no kernel-density overlay: with near-delta peaks its width
   would be pure kernel bandwidth.
 
-Because intervals are exact integer cycles plus a constant offset, cumulative-cycle-index binning is
-not an approximation to noisy timing - it recovers the true elapsed time. This is what the cycle-index
+Because intervals are exact integer cycles plus a constant offset, cumulative-cycle-index binning
+recovers the true elapsed time instead of approximating noisy timing. This is what the cycle-index
 design elsewhere in the tab rests on.
 
 > Details: `docs/MINFLUX_analysis_methods.md` §I-B.0.
@@ -1508,8 +1509,8 @@ Fitting is two-pass weighted least squares:
 
 The linear fit range comes from **Michalet & Berglund optimal-point selection** (OLSF) instead of a
 fixed percentage of the curve, with separate optimal point counts for the slope (→ D) and the intercept
-(→ σ²). Its adaptation to MINFLUX cycle lags - the iterative variant that converges onto the lowest,
-least-noisy lags, and the default 5–50 cycle fit window - follows **Vogler 2025** [7].
+(→ σ²). Its adaptation to MINFLUX cycle lags (the iterative variant that converges onto the lowest,
+least-noisy lags, and the default 5–50 cycle fit window) follows **Vogler 2025** [7].
 
 **Anomalous diffusion** model:
 
@@ -1688,7 +1689,7 @@ diameters also test whether σ ∝ L holds, which is what the beam FWHM ν field
 
 #### The wander floor
 
-The reported position wanders even on a genuinely immobile target, so any measured D carries an
+The reported position wanders even on an immobile target, so any measured D carries an
 instrumental floor. It is **photon-driven**, shrinking as the photon budget grows, and it worsens at
 larger TCP diameters.
 
@@ -1759,13 +1760,13 @@ and under-subtract it when z is tighter. The app-wide default stays pooled.
   95% CI, plus a σ–EFO Spearman ρ (precision should improve with photons, so negative ρ validates the
   model).
 
-The estimate is deliberately **unweighted by photons**. Weighting by brightness would up-weight slow
-molecules - for the coupling reason above - and bias D downward, so the pooled σ_loc and D_CVE treat
+The estimate is **unweighted by photons** on purpose. Weighting by brightness would up-weight slow
+molecules (for the coupling reason above) and bias D downward, so the pooled σ_loc and D_CVE treat
 every qualifying step equally.
 
 > **Detecting real z.** 2D exports routinely carry an all-zero `z` column, and `0` is finite, so a bare
 > presence test would treat 2D data as 3D and pool a zero-variance axis into the maths. A shared
-> predicate - more than 10 finite z values **and** sd > 1 nm - gates the 3D path for CVE, MSD, JDD,
+> predicate (more than 10 finite z values **and** sd > 1 nm) gates the 3D path for CVE, MSD, JDD,
 > confinement and displacement-vs-D alike, so the dimension decision cannot drift between tools.
 
 ---
@@ -1791,14 +1792,14 @@ primary discriminator) to identify mobility sub-populations, ordered from most c
 most mobile.
 
 > **Track-length dependence**: CI, and therefore the "confined %" readout, is **not comparable across
-> datasets with different track lengths** - a longer track has more opportunity to reveal a plateau.
+> datasets with different track lengths**, because a longer track has more opportunity to reveal a plateau.
 > Compare only at matched track lengths, and read the simulated null band shown alongside.
 
 ---
 
 ### Jump Distance Distribution (JDD)
 
-The step-length histogram is fitted with an **N-component scaled-chi mixture** - the law of $|\Delta r|$
+The step-length histogram is fitted with an **N-component scaled-chi mixture**, the law of $|\Delta r|$
 for a $d$-dimensional isotropic Gaussian displacement:
 
 ```math
@@ -1848,7 +1849,7 @@ colours the tracks. Intervals for D, rates and dwell times come from a bootstrap
 
 Per track, the net start-to-end displacement $R_\text{net} = |r(T) - r(0)|$ is compared against the
 free-diffusion expectation. It depends only on the two endpoints and the true elapsed time $T$, so it
-is **inherently robust to irregular Δt** - no cycle binning needed:
+is unaffected by irregular Δt and needs no cycle binning:
 
 ```math
 \frac{R_\text{net}^2}{2 D\, T} \sim \chi^2(d_\text{mot}), \qquad R_\text{net}^2 \leftarrow R_\text{net}^2 - 2 d \sigma_\text{loc}^2
@@ -1869,7 +1870,7 @@ step vectors:
 \theta = \arccos\!\left(\frac{\Delta r_i \cdot \Delta r_{i+1}}{|\Delta r_i|\,|\Delta r_{i+1}|}\right), \qquad AC(\text{lag}) = \langle \hat{v}_i \cdot \hat{v}_{i+\text{lag}} \rangle
 ```
 
-Both use only steps spanning at most a few dark cycles - a long-gap step has an unreliable direction.
+Both use only steps spanning at most a few dark cycles, because a long-gap step has an unreliable direction.
 The autocorrelation lag is **elapsed time** (cycle lag × $t_c$). A noise floor at RMS
 step $= 2\sigma_\text{loc}$ quantifies how much of any backward peak is localization noise rather than
 real anti-persistence.
@@ -1878,8 +1879,8 @@ real anti-persistence.
 
 ### Speed & Transport
 
-Path speed $dr/dt$ cannot separate transport from diffusion - a finely sampled random walk has a high
-path speed. Two quantities that can:
+Path speed $dr/dt$ cannot separate transport from diffusion, because a finely sampled random walk has
+a high path speed. Two quantities can:
 
 ```math
 v_\text{drift}(t) = \frac{|\text{net displacement over window } W|}{W}, \qquad \alpha(t) = \frac{d \log \text{MSD}}{d \log \tau}
@@ -1960,7 +1961,7 @@ Typical ladders, for orientation:
 
 Without a sequence file the app falls back to 100 nm. Vogler quote 150 nm because their sequence stops
 one iteration earlier; an imaging sequence's 39.6 nm is a different regime entirely. Since the ceiling
-scales as $L^2$, this is the input that most rewards being read from the sequence file.
+scales as $L^2$, read this value from the sequence file if you can.
 $t_\text{hw}$ defaults to 0.05 ms, Vogler's $t_{\text{hw},\eta=1} \approx 52\ \mu\text{s}$ for a
 hexagonal TCP.
 
@@ -2024,7 +2025,7 @@ MINFLUXR/
 ## Notes & Tips
 
 - **No automatic quality filter**: nothing is removed on load except invalid records (`vld = FALSE`).
-  In particular there is **no automatic CFR cutoff** in either tab - CFR discriminates artefacts poorly
+  In particular there is **no automatic CFR cutoff** in either tab. CFR discriminates artefacts poorly
   in tracking data, and in SMLM it is your call. Set the CFR range yourself if you want
   one.
 - **Z-axis scaling**: the default of 0.7 corrects for the refractive-index mismatch between water
@@ -2048,7 +2049,7 @@ MINFLUXR/
   Plot Data reads from that frozen original, so resetting all filters and pressing it again recovers
   the full dataset.
 - **MSD fit range**: the linear fit uses Michalet & Berglund optimal-point selection for you. If you
-  override it, keep to the early lags - later points rest on fewer pairs, have higher variance, and
+  override it, keep to the early lags. Later points rest on fewer pairs, have higher variance, and
   deviate from the linear model through confinement or undersampling.
 
 ---

@@ -1,12 +1,12 @@
-# MINFLUXR Plugins — how to build your own
+# MINFLUXR plugins: how to build your own
 
 MINFLUXR is a Shiny app made of a few core tabs (SMLM Analysis, Tracking
 Analysis, MINFLUX Simulator). The **plugin system** lets you add your own tab
 with your own analysis **without editing any core file**. You write a small
 self-contained folder; the app discovers and loads it at startup.
 
-This folder (`plugin/`) is the **template**. It is not loaded by the app — it is
-the thing you copy. `plugin/plugin.R` is a working example you can run as-is and
+This folder (`plugin/`) is the **template**. The app does not load it; you copy
+it. `plugin/plugin.R` is a working example you can run as-is and
 then modify.
 
 ---
@@ -14,7 +14,7 @@ then modify.
 ## 1. Quick start (5 minutes)
 
 1. **Copy** this `plugin/` folder to `plugins/myplugin/`
-   (the app loads from `plugins/`, plural — see [§4](#4-why-plugin-and-plugins)).
+   (the app loads from `plugins/`, plural; see [§4](#4-why-plugin-and-plugins)).
 
    ```
    MINFLUXR/
@@ -28,7 +28,7 @@ then modify.
    appears at the end of the navbar.
 
 3. Load a file in the **SMLM Analysis** tab, switch to **My Plugin**, click the
-   button — it reports how many localizations are loaded. That round-trip proves
+   button. It reports how many localizations are loaded. That round-trip proves
    your plugin can read the core app's live data.
 
 4. **Rename and edit.** Change the title, the `value` id, the `myplugin_*` input
@@ -42,7 +42,7 @@ To **remove** a plugin, delete its folder under `plugins/`. Nothing else changes
 
 A plugin is just an R script that, when sourced, defines a **UI tab** and a
 **server function**, then **registers** them. Look at `plugin.R` alongside this
-list — the sections are numbered to match.
+list; the sections are numbered to match.
 
 ### 2.1 Define a UI tab
 
@@ -59,7 +59,7 @@ my_ui_tab <- tabPanel(
 ### 2.2 Define a server function
 
 Your server function receives the live Shiny `input`, `output`, `session`, plus
-`smlm` — a bundle of the core SMLM tab's data (see [§3](#3-the-smlm-data-handle)).
+`smlm`, a bundle of the core SMLM tab's data (see [§3](#3-the-smlm-data-handle)).
 
 ```r
 my_server <- function(input, output, session, smlm) {
@@ -117,7 +117,7 @@ shiny::validate(shiny::need(is.data.frame(df) && nrow(df) > 0,
                             "Load a file in the SMLM Analysis tab first."))
 ```
 
-> These handles are **read-only** for your purposes — treat them as inputs. Don't
+> These handles are **read-only** for your purposes. Treat them as inputs. Don't
 > try to write back into the core app's state; build your own outputs instead.
 
 ---
@@ -139,9 +139,9 @@ times as you like into `plugins/`.
 All plugins and the core app share **one Shiny namespace**. Two things must be
 globally unique or the app will misbehave:
 
-1. **Tab `value` ids** — don't reuse the core ids (`tab_smlm`, `tab_tracking`,
+1. **Tab `value` ids**: don't reuse the core ids (`tab_smlm`, `tab_tracking`,
    `tab_sim`). Use something like `tab_myplugin`.
-2. **Every `input$...` and `output$...` id you create** — prefix them all with
+2. **Every `input$...` and `output$...` id you create**: prefix them all with
    your plugin name, e.g. `myplugin_go`, `myplugin_summary`. This is the single
    most common source of plugin bugs.
 
@@ -222,11 +222,11 @@ All the tabs are driven by the same `server_fn`.
 
 You don't need to edit these, but it helps to know where the hooks are:
 
-- **`global.R`** — defines `register_plugin()`, then discovers and sources every
+- **`global.R`**: defines `register_plugin()`, then discovers and sources every
   `plugins/*/plugin.R` (setting `.plugin_dir` first). Collects tabs into
   `.plugin_tabs` and server functions into `.plugin_servers`.
-- **`ui.R`** — appends `.plugin_tabs` to the `navbarPage` after the core tabs.
-- **`server.R`** — after starting the core servers, calls each plugin server:
+- **`ui.R`**: appends `.plugin_tabs` to the `navbarPage` after the core tabs.
+- **`server.R`**: after starting the core servers, calls each plugin server:
   `.srv(input, output, session, smlm = smlm_exports)`.
 
 That's the entire contract. If your `plugin.R` defines a tab, defines a server

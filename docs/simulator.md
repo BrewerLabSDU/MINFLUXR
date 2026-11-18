@@ -1,4 +1,4 @@
-# MINFLUX Simulator — Reference
+# MINFLUX Simulator reference
 
 *Reference for the Simulator tab: what it models, how each stage works, and where it departs from
 real MINFLUX (§7).* Code: [`server/sim/`](../server/sim/) (session logic), [`R/sim_*.R`](../R/) (generators), [`sim_ui.R`](../sim_ui.R) ·
@@ -32,7 +32,7 @@ disagree about how MINFLUX works, Phase 2 is right.
 
 ---
 
-## 1. Phase 1 — the SMLM generative pipeline
+## 1. Phase 1: the SMLM generative pipeline
 
 One pass of `sim_result()` ([`server/sim/02_smlm_simulation.R`](../server/sim/02_smlm_simulation.R)) runs seven stages. Each is a
 separate, inspectable model; understanding which stage a parameter acts on is most of understanding
@@ -83,10 +83,10 @@ inflates the apparent radius instead. Both are real, for different labels.
 
 `expand_to_fluorophores()` ([`R/sim_labeling.R`](../R/sim_labeling.R)) turns molecules into
 **fluorophores**, and *one fluorophore = one future trace ID*. Presets come from
-`minflux_label_presets()` in `helpers_shared.R` — a single source of truth shared with the SMLM tab's
-inverse GT estimator, so the estimator inverts exactly what this generates.
+`minflux_label_presets()` in `helpers_shared.R`. The SMLM tab's inverse GT estimator reads the same
+presets, so it inverts exactly what this generates.
 
-#### 1.2.1 How many dyes — and how many of them are seen
+#### 1.2.1 How many dyes, and how many of them are seen
 
 For molecule *m*, the dye count is a **zero-truncated Poisson**, and each dye is then detected
 independently at the labeling efficiency *p* = `eff_pct`/100:
@@ -111,7 +111,7 @@ Because `K_m` is itself random, the detection probability is `E[1 − (1−p)^{K
 where the true value is 80 %. The table below reports the averaged values.
 
 At p = 0.5 a single-dye tag finds half your molecules, but a 9-dye polyclonal finds **98.9 %**. This
-is why multi-dye labels are so forgiving of poor efficiency — and simultaneously why they wreck
+is why multi-dye labels are so forgiving of poor efficiency, and also why they wreck
 counting, since the same property multiplies TIDs (below). The simulator gets this for free by
 applying efficiency per *dye*, never per molecule.
 
@@ -171,14 +171,14 @@ can sit and still satisfy the existing 2× criterion.
 Note `n_fluor` = 1 takes a separate code branch (`K` = 1 exactly, no Poisson draw), which is why
 `E[K]` is 1.00 there and 2.14 for `n_fluor` = 2.
 
-Read the two right-hand columns together with the TID column — they are the whole labeling
-trade-off in one place:
+Read the two right-hand columns together with the TID column. Between them they show the labeling
+trade-off:
 
 - **A polyclonal + secondary sandwich turns one protein into ~32 trace IDs**, none of which can be
   told apart from 32 real proteins without de-blinking or clustering. Counting experiments should not
   use it.
 - **The floor is set by the linker alone** and no acquisition time touches it. An IgG sandwich cannot
-  resolve anything closer than ~50 nm — so for the 8-molecule filament question, a 15 nm spacing needs
+  resolve anything closer than ~50 nm, so for the 8-molecule filament question, a 15 nm spacing needs
   a nanobody or a direct tag, and *any* antibody route fails before the run even starts.
 - Multi-dye labels buy *detection* (99.8 % vs 50 %) and pay in *over-counting* and *spread*. They do
   **not** buy precision: `dye_spread` averages down over dyes, but the shared linker never does.
@@ -204,9 +204,9 @@ density (in `sim_result()`, [`server/sim/02_smlm_simulation.R`](../server/sim/02
 Real MINFLUX over-counts: one physical dye can be re-acquired many times and appears as several
 `tid`s. Two mutually exclusive models, selected by the mode:
 
-- **Normal mode — `split_for_blinking()`** ([`R/sim_labeling.R`](../R/sim_labeling.R)). Each
+- **Normal mode, `split_for_blinking()`** ([`R/sim_labeling.R`](../R/sim_labeling.R)). Each
   fluorophore gets `K ~ Poisson(λ)` extra TIDs at the **same position**. Apparent TIDs ≈ (1+λ) × dyes.
-- **Acquisition mode — rate × duration sampling** (in `sim_result()`, [`server/sim/02_smlm_simulation.R`](../server/sim/02_smlm_simulation.R), with `sim_sample_detection_times()` in [`R/sim_acquisition.R`](../R/sim_acquisition.R)).
+- **Acquisition mode, rate × duration sampling** (in `sim_result()`, [`server/sim/02_smlm_simulation.R`](../server/sim/02_smlm_simulation.R), with `sim_sample_detection_times()` in [`R/sim_acquisition.R`](../R/sim_acquisition.R)).
   Each pool fluorophore gets a photon budget `k_i = 1 + Poisson(blinks−1)`; the requested number of
   detections `n_req` is drawn **without replacement** from that capacity, so dyes with a larger budget
   are found sooner and the total saturates at `Σk_i`.
@@ -215,13 +215,13 @@ Real MINFLUX over-counts: one physical dye can be re-acquired many times and app
 
 Two modes:
 
-- **Manual** — you type σ_xy and σ_z directly.
+- **Manual**: you type σ_xy and σ_z directly.
 - **CRLB from photon budget** (`smlm_sigma_loc()` in [`packages.R`](../packages.R)):
 
   ```
   σ_CRLB = L / (√8 · √N) · g,   g = √(4 − f) / (2 · (1 − f))
   σ_xy   = √( (k · σ_CRLB)² + σ₀² )
-  σ_z    = σ_xy × z_factor            (default 0.7 — z TIGHTER than xy)
+  σ_z    = σ_xy × z_factor            (default 0.7: z tighter than xy)
   ```
 
   `L` is the physical diameter of the final targeting pattern (TCP), the instrument setting (imaging
@@ -282,8 +282,8 @@ limit for now" from "not resolvable with this label".
 `gen_localizations()` ([`R/sim_labeling.R`](../R/sim_labeling.R)) draws a trace length per
 fluorophore and scatters that many points around it:
 
-- **Poisson(λ)** by default; **Geometric(1/λ)** with the "heavy-tailed trace length" toggle — same
-  mean, heavy right tail, which is what constant per-step bleaching actually produces and what real
+- **Poisson(λ)** by default; **Geometric(1/λ)** with the "heavy-tailed trace length" toggle: same
+  mean, heavy right tail, which is what constant per-step bleaching produces and what real
   MINFLUX trace-length histograms look like.
 - **Scale by fluorophore count** divides λ by the number of dyes on the molecule, modelling a fixed
   observation budget per molecule rather than per dye.
@@ -298,9 +298,9 @@ all real TIDs and carry `mol_id = NA`, so scoring excludes them.
 
 ### 1.7 Scoring (stage 7)
 
-- **RMSE** — per-TID distance between the trace median and its source GT molecule (real TIDs only,
+- **RMSE**: per-TID distance between the trace median and its source GT molecule (real TIDs only,
   capped at 1000 sampled TIDs).
-- **Precision budget** (`output$sim_precision_budget`, [`server/sim/05_smlm_outputs.R`](../server/sim/05_smlm_outputs.R)) — a bar chart of the error terms
+- **Precision budget** (`output$sim_precision_budget`, [`server/sim/05_smlm_outputs.R`](../server/sim/05_smlm_outputs.R)): a bar chart of the error terms
   as **radial RMS**, their quadrature sum, the observed RMS overlaid, the **label floor**, and a
   **resolvability verdict** comparing GT nearest-neighbour spacing against 2× the per-molecule error.
   The formula and its validation are in §7.10.
@@ -340,7 +340,7 @@ unique(t)  = Σ_m [ 1 − exp(−f_m · c_m · cum_R / n_pool) ]   distinct mole
 
 `f_m` = dyes on molecule *m*; `c_m` = the optional **crowding** weight `1/(1+neighbours within R)`,
 which slows discovery where emitters sit inside one doughnut. **Time-to-resolve is driven by
-`cum_R` only** — it is deliberately independent of the per-dye blink budget, so "detections before
+`cum_R` only.** It is independent of the per-dye blink budget by design, so "detections before
 bleaching" changes over-counting but never the road to X %.
 
 This timeline is recomputed **live** (`sim_acq_live()`) from the last-generated fluorophore pool, so
@@ -353,7 +353,7 @@ rate/duration/background respond without re-Generating. See §7.5 for the conseq
 
 **Reading conventions.** The loader mirrors the SMLM tab: `.npy` / `.json` are read with
 `z_scale = 1.0` (raw, uncorrected z), a `.csv` is returned to raw by `strip_csv_z_calibration()`,
-and every source then goes through `canonicalize_minflux_df()` — so alternative headers
+and every source then goes through `canonicalize_minflux_df()`, so alternative headers
 (`trace_id`, `x_nm`, `photons`, …) are accepted here as they are elsewhere. **One** axial factor is
 then applied, under user control:
 
@@ -362,12 +362,12 @@ then applied, under user control:
 | `.npy` / `.json` | raw instrument data | 0.7 (the correction still to apply) |
 | `.csv` from this app | factor recorded in the file (`z_scale_applied`) | that exact factor, marked *certain* |
 | `.csv` from pyMINFLUX / unknown | assumed | 0.7, marked *assumed* |
-| any 2D run | no axial structure | nothing — the control is hidden |
+| any 2D run | no axial structure | nothing; the control is hidden |
 
 The factor is applied in one place (`sim_real_gated()`), so σ_z and the FOV depth can never disagree
 with the number on screen, and changing it re-runs the calibration. Reading with the readers' own
 0.7 default instead would bake the correction into `.npy`/`.json` while leaving a `.csv` at whatever
-its producer applied — the same run would then yield a different σ_z per format.
+its producer applied, and the same run would then yield a different σ_z per format.
 
 > **Two different 0.7s.** This axial factor is a refractive-index correction on the *coordinates*.
 > `sim_crlb_z_factor` (also ≈0.7) is the σ_z/σ_xy *precision ratio*. They are unrelated and must not
@@ -379,15 +379,15 @@ its producer applied — the same run would then yield a different σ_z per form
 1. **EFO** and **CFR** ranges gate individual localizations.
 2. Trace length is then **recounted on the survivors**, and the length range drops whole traces.
 
-So "localizations per trace" means *usable* locs per trace — gating hard on EFO and then asking for
+So "localizations per trace" means *usable* locs per trace. Gating hard on EFO and then asking for
 ≥ 20 locs is far stricter than either gate alone, which is why the info box reports both stages.
 Ranges default to each file's own full extent (a true no-op); absent columns disable their gate
 rather than silently passing everything; non-finite values are kept and counted separately, so a
 full-range gate never drops anything. Changing any range re-runs the whole calibration.
 
 Gating is **not neutral**: EFO, CFR and length all select the brighter, better-centred, longer-lived
-molecules, which are also the most precise ones — so a narrowed gate yields a σ tighter than the run
-as a whole. The info box says so whenever a range is actually narrowed.
+molecules, which are also the most precise ones, so a narrowed gate yields a σ tighter than the run
+as a whole. The info box says so whenever a range is narrowed.
 
 Measured, after gating:
 
@@ -417,7 +417,7 @@ axis ratios, since both axes share the same *n*.
 The ratios are taken as the **median of per-trace ratios**, not the ratio of medians: within one
 trace both axes share a photon count, so the per-trace ratio divides the photon dependence out and
 measures cloud shape alone. `median(log(s_y/s_x))` is exactly `log(σ_y/σ_x)` because the two noise
-terms are i.i.d. and their difference is symmetric — verified unbiased to +0.11 % (MC se 0.08 %).
+terms are i.i.d. and their difference is symmetric (verified unbiased to +0.11 %, MC se 0.08 %).
 
 `apply_real_rates()` splits the measured total rate into a **constant background offset** and a
 **time-varying structure component**, using the structure fraction, and pushes both plus the level.
@@ -428,7 +428,7 @@ have to pick a synthetic shape by hand.
 
 ## 5. The Confocal comparison view
 
-Genuinely a *detection* PSF model, unlike the MINFLUX view — the word "PSF" is correct here:
+Unlike the MINFLUX view, this is a *detection* PSF model, so the word "PSF" is correct here:
 
 ```
 σ_ex  = 0.21·λ_ex/NA ;  σ_em = 0.21·λ_em/NA
@@ -441,7 +441,7 @@ with Airy encircled-energy collection efficiency `1 − J₀(v)² − J₁(v)²`
 reproduces the real pinhole trade-off (closing it sharpens and sections but costs photons). Rendered
 from the **unique fluorophore pool**, so a re-detected molecule is drawn at its physical brightness. Poisson shot noise on top.
 
-## 6. Phase 2 — Diffusion / Tracking, in one paragraph
+## 6. Phase 2: Diffusion / Tracking, in one paragraph
 
 Brownian motion on a sphere / rod / ellipsoid / membrane plane / unbounded volume, surface (2 DOF) or
 volume (3 DOF), with free / OU-confined / directed / two-state motion, sampled through a MINFLUX
