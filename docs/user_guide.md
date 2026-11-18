@@ -229,9 +229,9 @@ centre. **Agreement** decides whether both traces must vote for each other (mutu
 enough.
 
 - *Parameters* - *f*, the fraction that must agree (default 0.3). Two traces of the *same* molecule
-  score ≈0.5 by construction, so useful values sit well below 0.5; below about 0.25 a single
+  score ≈0.5 by construction, so useful values sit well below 0.5; at low *f* a single
   localization can decide a short trace. *Distance tolerance* ρ (default 3.0) loosens the "strictly
-  closer" test; grouping accuracy rises with ρ and then flattens, so erring high costs little.
+  closer" test.
 - *Advantages* - no distance in nm and no dependence on the measured spread, so it needs neither a
   threshold nor a well-behaved σ. It is self-scaling: a diffuse trace automatically demands
   proportionally more separation than a tight one, which suits heterogeneous data. A stray
@@ -248,9 +248,7 @@ it.
 #### Choosing the threshold
 
 *Measure threshold from data* sets it from your own file: it measures the per-axis trace spread and
-returns **k × that spread**, with *k* defaulting to 2.8. Grouping accuracy is flat between about
-k = 2.6 and 3.1, and because a molecule can never be wider than the threshold, overshooting costs less
-than undershooting. The default sits inside that plateau.
+returns **k × that spread**, with *k* defaulting to 2.8.
 
 The threshold is the trace spread times *k*, with no drift term. Sample drift is measured and
 reported in the [Localization Precision Cloud](#panels) QC panel, but kept out of this number. The only
@@ -1410,7 +1408,7 @@ $\text{SW} = \text{centre}_1 - t_c$; (4) a regression from the Δt-vs-index slop
 Method (3) uses the **spacing between clusters**, because:
 
 > ⚠ **The modal Δt is not the cycle time.** It is $1 \cdot t_c + \text{SW}$. Mistaking one for the
-> other biases every D by about **−5.5%**.
+> other biases every D, by an amount set by SW relative to $t_c$.
 
 #### What the interval structure looks like
 
@@ -1584,19 +1582,16 @@ not vanish. The general form is
 ```
 
 with $R$ the motion-blur coefficient from the sequence timing, at most $t_c/(6\,\Delta t)$ when the
-photon-collection window spans the whole cycle. Reading MINFLUX data at $R = 0$ under-reports σ roughly
-threefold.
+photon-collection window spans the whole cycle. Reading MINFLUX data at $R = 0$ under-reports σ.
 
 In time units the blur shortens every step's effective diffusion time by $2R_\text{abs}$, with
 $R_\text{abs} = R\,(t_c + \text{SW})$ in ms. JDD, the D-map, change-point detection and the HMM
 subtract this offset.
 
-Correcting R is necessary but not sufficient. Near that ceiling roughly **90% of $\sigma^2$ comes
-from the $R\langle\Delta x^2\rangle$ term**, so the estimate is close to
-$\sqrt{R} \times \text{rms step}$, a function of the assumed R and of the step-size distribution,
-which population heterogeneity and any residual drift both inflate. What the data contributes
-independently, $\text{cov}_1$, is a few-percent residual. On an immobile sample the increments can
-even come out *positively* correlated, at which point the estimator returns no solution at all.
+Correcting R is necessary but not sufficient. Near that ceiling the $R\langle\Delta x^2\rangle$ term
+dominates, so the estimate is close to $\sqrt{R} \times \text{rms step}$, a function of the assumed R
+and of the step-size distribution, which population heterogeneity and any residual drift both
+inflate. When the increments come out *positively* correlated, the estimator has no solution.
 
 The limit is identifiability. Within one trajectory, blur and precision enter the covariance in the
 same place, so MSD-intercept and MLE fits inherit the same degeneracy.
@@ -1647,8 +1642,7 @@ steps) is fitted as $\text{MSD} = 4\sigma^2 + 4D_w(k - 2R)\,\Delta t$, with R th
 from the file's photon collection window: residual motion is averaged over each localization, which
 lowers the intercept by $8RD_w\Delta t$, so leaving R out reads σ low. The intercept then gives σ, and
 $a = L\sqrt{\langle 1/N\rangle}/\sigma$. The result is the median across cells, with the quartiles showing
-how well the cells agree, and the summary shows how far $a$ would move if R were 30% off. On typical
-sequences that is a few percent, smaller than the spread between cells.
+how well the cells agree, and the summary shows how far $a$ would move if R were 30% off.
 
 $a$ changes with the photon limit as well as with the pattern, L and dwell, so one profile describes
 one sequence. The cleaning and filters matter too: the floor in particular depends on which tracks
@@ -1711,34 +1705,6 @@ $D_\text{max}$ headroom for a floor you can get under.
 - D and σ_loc, with the route used for each.
 
 Table 2 of Vogler et al. 2025 is a good template.
-
-#### What the simulator round-trip still covers
-
-The simulator generates tracks with a dialled-in D and then runs the same CVE over them
-(`docs/simulation_module.md` §6a). Demoting the CVE for σ_loc leaves that loop in place, and if
-anything it now carries more weight, because D is the one quantity the CVE still supplies to the rest
-of the app. It remains the check on the parts of the D path that are easy to get wrong and hard to
-see: the single-cycle step restriction, the Δt = t_c + SW convention, and the motion-dimensionality
-denominator (2 for surface diffusion, 3 for volume) that would otherwise under-report D by a third on
-membrane and rod geometries.
-
-The σ_loc half of the same scorecard has narrowed in scope, for two reasons.
-
-Its target moved. Simulated positions are now perturbed with the same photon-budget expression the
-Tracking tab applies ($\sigma = L/(a\sqrt{N})$), so recovering σ from those tracks confirms the
-arithmetic is consistent between the forward and inverse paths, and confirms nothing about whether
-the expression describes a real microscope. Only immobile-sample data can speak to that.
-
-Its conditions are gentler than reality. The simulator draws each position independently around the
-true one, with no model of the tracking feedback loop. On the instrument the TCP is recentred on its
-own noisy estimate, which turns part of that error into a correlated wander (§ *The wander floor*),
-and it is precisely that correlation which defeats covariance-based σ estimation on real data. A
-covariance σ estimator can therefore round-trip well in simulation while failing on the microscope,
-which is roughly what happened here.
-
-Read a σ_loc round-trip as a unit test on the estimator arithmetic under ideal noise. Read the D
-round-trip as the validation of the D path it has always been. Adding a recentring loop to the
-simulator would close the gap, and is the change that would make the σ half informative again.
 
 #### Lateral vs axial precision
 

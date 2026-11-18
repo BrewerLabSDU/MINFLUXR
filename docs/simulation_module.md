@@ -194,7 +194,7 @@ D. Then, per Vestergaard et al. 2014:
 > fraction of the cycle), 0 without
 
 D is blur-independent. σ_loc is not, and reading a blurred acquisition with R = 0 (σ² = −cov₁)
-under-reports it roughly threefold.
+under-reports it.
 
 > **The σ half is a unit test.** Simulated positions use the same photon-budget σ the Tracking tab
 > applies (see `sigma_loc_model.md`), so recovering σ only confirms the forward and inverse arithmetic
@@ -211,12 +211,12 @@ dimensionality (2 for surface diffusion, 3 for volume), while σ_loc is normalis
 number of **Cartesian axes observed**. For a protein diffusing on a membrane or a rod surface these
 differ: the motion is 2D but you observe x, y and z. Using n_cart = 3 in the D denominator would
 under-report D by a factor of 3/2 on exactly the geometry most MINFLUX membrane work targets. The
-Tracking tab corrects for this through its **Sample geometry** setting, and the round-trip verifies
-the correction: without it the recovered ratio is 2/3.
+Tracking tab corrects for this through its **Sample geometry** setting; without it D comes out at 2/3
+of the truth.
 
 **How to read it.** A round-trip ratio near 1.0 means the estimator is unbiased for that geometry,
-sampling rate and σ_loc. A systematic departure is the *geometric bias* of §7. It belongs to the
-estimator and the geometry, so it transfers to real acquisitions with the same shape and cycle time.
+sampling rate and σ_loc. A systematic departure is the *geometric bias* of §7, a property of the
+estimator and the geometry.
 
 **Caveat.** The round-trip validates the estimator against the *simulator's* motion model. It cannot
 detect a mismatch between that model and real biology. If a real protein hops between domains and

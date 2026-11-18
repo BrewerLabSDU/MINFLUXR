@@ -140,7 +140,7 @@ results are in `tests/validation/`.
 | whether a method suits your data, and what to check first | [`docs/MINFLUX_analysis_methods.md`](docs/MINFLUX_analysis_methods.md), Part II: the sources each method rests on and the assumptions to check |
 | where the tracking σ<sub>loc</sub> comes from, and why the prefactor must be calibrated | [`docs/sigma_loc_model.md`](docs/sigma_loc_model.md) |
 | what the SMLM simulator models and how far to trust it | [`docs/simulator.md`](docs/simulator.md) |
-| what the diffusion (tracking) simulator models and how it was validated | [`docs/simulation_module.md`](docs/simulation_module.md) |
+| what the diffusion (tracking) simulator models and what its built-in round-trip computes | [`docs/simulation_module.md`](docs/simulation_module.md) |
 | whether a result can be reproduced | the [Reproducibility](docs/user_guide.md#reproducibility) section of the user guide |
 | what changed between versions | [`CHANGELOG.md`](CHANGELOG.md) |
 | where the code for a panel lives, or how to add one | [`server/README.md`](server/README.md), then the header of the part file |
@@ -155,7 +155,7 @@ results are in `tests/validation/`.
 | [`docs/user_guide.md`](docs/user_guide.md) | Panel-by-panel reference: every control, every output, and the calculations behind them |
 | [`docs/MINFLUX_analysis_methods.md`](docs/MINFLUX_analysis_methods.md) | Part I: the implementation and maths of every analysis. Part II: for each method, the published sources it rests on, what MINFLUXR adapts for MINFLUX data, and the assumptions to check on your own data |
 | [`docs/simulator.md`](docs/simulator.md) | The Simulator tab: what each stage models and where it departs from real MINFLUX |
-| [`docs/simulation_module.md`](docs/simulation_module.md) | The ground-truth diffusion simulator: model, validation and the CVE round-trip on D |
+| [`docs/simulation_module.md`](docs/simulation_module.md) | The ground-truth diffusion simulator: model, outputs and the built-in CVE round-trip on D |
 | [`docs/sigma_loc_model.md`](docs/sigma_loc_model.md) | The tracking localization-precision model: derivation and immobile-sample calibration |
 | [`THIRD-PARTY.md`](THIRD-PARTY.md) | External work this builds on, what was taken and what was changed |
 | [`server/README.md`](server/README.md) | How the server code is laid out: one part file per panel under `server/<tab>/`, computation in `R/` |

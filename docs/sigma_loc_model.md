@@ -201,7 +201,7 @@ general result is
 ```
 
 with $R$ the motion-blur coefficient of the step, set by the photon-collection window and at most
-$t_c/(6\Delta t)$ for a window that spans the whole cycle. Near that ceiling roughly 90% of the answer is the first term, which is just
+$t_c/(6\Delta t)$ for a window that spans the whole cycle. Near that ceiling the first term dominates, and it is just
 $\sqrt{R} \times$ rms step. Blur and precision enter the covariance in the same place, so no estimator
 built on the increment covariance can separate them from a single trajectory. This identifiability
 limit applies to every estimator, MLE included.

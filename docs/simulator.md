@@ -180,7 +180,7 @@ trade-off:
 - **The floor is set by the linker alone** and no acquisition time touches it. An IgG sandwich cannot
   resolve anything closer than ~50 nm, so for the 8-molecule filament question, a 15 nm spacing needs
   a nanobody or a direct tag, and *any* antibody route fails before the run even starts.
-- Multi-dye labels buy *detection* (99.8 % vs 50 %) and pay in *over-counting* and *spread*. They do
+- Multi-dye labels buy *detection* (98.9 % vs 50 % in the table above) and pay in *over-counting* and *spread*. They do
   **not** buy precision: `dye_spread` averages down over dyes, but the shared linker never does.
 
 #### 1.2.5 What survives averaging
@@ -257,8 +257,7 @@ Two modes:
   (weights dof/σ⁴) gives A (slope) and B = σ₀² (intercept). k = √A / (L·g/√8) at the L and background
   set when calibrating, so change L first if yours is not 40 nm. A negative term is set to zero and the
   other refitted. If 1/N spans less than 1.5× across bins, slope and intercept trade off freely: the
-  fit is refused, k is set to 1 and the rest of the measured variance goes to σ₀. On synthetic traces
-  (800 traces, lognormal photons) the fit recovers k within ~3% and σ₀ within ~0.3 nm.
+  fit is refused, k is set to 1 and the rest of the measured variance goes to σ₀.
 
   The fit assumes the excess variance does not itself depend on brightness. Bright and dim traces
   can differ in other ways (focal position, dye state), which the fit would read as a photon effect.
@@ -303,7 +302,6 @@ all real TIDs and carry `mol_id = NA`, so scoring excludes them.
 - **Precision budget** (`output$sim_precision_budget`, [`server/sim/05_smlm_outputs.R`](../server/sim/05_smlm_outputs.R)): a bar chart of the error terms
   as **radial RMS**, their quadrature sum, the observed RMS overlaid, the **label floor**, and a
   **resolvability verdict** comparing GT nearest-neighbour spacing against 2× the per-molecule error.
-  The formula and its validation are in §7.10.
 
 ---
 
@@ -410,14 +408,13 @@ user push short traces into the median, so each trace's SD is divided by its own
 The textbook constant `c₄(n) = E[s]/σ` is **the wrong one here**: it un-biases the *mean* of the
 sampling distribution, while this aggregates with a *median*, and `median(s) < E[s]` at small *n*.
 The matching constant is the median of the same chi distribution,
-`m(n) = √(qchisq(0.5, n−1)/(n−1))`; at *n* = 3, `c₄ = 0.886` and `m = 0.833`. On simulated short traces
-the m-corrected median recovers σ, where the raw median reads several percent low. Either constant **cancels exactly** in the
+`m(n) = √(qchisq(0.5, n−1)/(n−1))`; at *n* = 3, `c₄ = 0.886` and `m = 0.833`. Either constant **cancels exactly** in the
 axis ratios, since both axes share the same *n*.
 
 The ratios are taken as the **median of per-trace ratios**, not the ratio of medians: within one
 trace both axes share a photon count, so the per-trace ratio divides the photon dependence out and
 measures cloud shape alone. `median(log(s_y/s_x))` is exactly `log(σ_y/σ_x)` because the two noise
-terms are i.i.d. and their difference is symmetric (verified unbiased to +0.11 %, MC se 0.08 %).
+terms are i.i.d. and their difference is symmetric.
 
 `apply_real_rates()` splits the measured total rate into a **constant background offset** and a
 **time-varying structure component**, using the structure fraction, and pushes both plus the level.
