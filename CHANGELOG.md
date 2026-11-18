@@ -3,9 +3,9 @@
 Notable changes to MINFLUXR. Versions follow [semantic versioning](https://semver.org);
 while the app is below 1.0 the panel layout and the settings JSON may still change between releases.
 
-## 0.7.1 - unreleased
+## 0.7.1 - date-released: "2026-11-18"
 
-Maintenance release: the code was reorganised for testing, and the fixes below came out of
+Maintenance release: the code was reorganized for testing, and the fixes below came out of
 that work. Results change where an entry says so.
 
 ### SMLM: one filter chain for the plot and the all-files panels
